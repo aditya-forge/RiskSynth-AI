@@ -1,0 +1,591 @@
+# configs/model_config.yaml
+# RiskSynth AI - generative models, constraints, profiling models and evaluation
+# (migrated from synth-bank-es; credit-scoring sections kept as legacy)
+#
+# Feature definitions live in data_config.yaml -> wealth_profile_schema.
+# Migration notes: docs/migration-notes.md
+# Pre-migration copy: archive/configs_pre_risksynth/model_config.yaml
+
+schema_version: "2.0.0"
+
+synthetic_generation:
+  default_method: "ctgan"
+  random_seed: 42
+  versioning: true
+
+  # Hybrid strategy: SDV learns the INE-grounded base (demographics, income,
+  # expenses, debt). Wealth features are then derived by seeded rules
+  # (data_config.yaml -> wealth_profile_schema), so deterministic identities
+  # (e.g. investable_surplus = max(0, raw_surplus)) hold exactly. GANs only
+  # approximate such identities.
+  pipeline:
+    stage_1_base:
+      engine: "sdv"                     # uses methods.<default_method>
+      learned_columns:
+        - edad
+        - sexo
+        - ccaa
+        - nivel_estudios
+        - situacion_laboral
+        - n_miembros
+        - dependent_children
+        - contract_type
+        - net_income_annual_eur
+        - household_expenses_annual_eur
+        - debt_service_annual_eur
+        - main_residence_value_eur
+        # liquid_savings_eur is not observed in INE: stage 2 takes it from generator
+        # balances or from wealth_profile_schema...liquid_savings_eur.fallback_model
+      training_table: "src/risksynth/engine/wealth_profile.py::build_stage1_table (EPF household heads)"
+    stage_2_wealth_features:
+      engine: "rules"
+      spec: "data_config.yaml#wealth_profile_schema"
+      seed_offset: 1000                 # rng seed = random_seed + seed_offset
+    stage_3_edge_cases:
+      engine: "conditional_sampling_with_rejection"
+      spec: "data_config.yaml#edge_case_profiles"
+      seed_offset: 2000
+
+  # SDV metadata sdtypes for the new columns (used if they are ever learned directly)
+  sdv_metadata_overrides:
+    risk_tolerance_score: {sdtype: "numerical", computer_representation: "Int8"}
+    risk_tolerance_category: {sdtype: "categorical"}
+    investment_horizon_years: {sdtype: "numerical", computer_representation: "Float"}
+    investment_horizon_bucket: {sdtype: "categorical"}
+    max_acceptable_drawdown_pct: {sdtype: "numerical", computer_representation: "Float"}
+    liquidity_need_pct: {sdtype: "numerical", computer_representation: "Float"}
+    investable_surplus_eur: {sdtype: "numerical", computer_representation: "Float"}
+    raw_surplus_eur: {sdtype: "numerical", computer_representation: "Float"}
+    esg_preference_level: {sdtype: "categorical"}
+    primary_investment_goal: {sdtype: "categorical"}
+    edge_case_id: {sdtype: "categorical"}
+
+  methods:
+    ctgan:
+      enabled: true
+      hyperparameters:
+        epochs: 300
+        batch_size: 500
+        generator_dim: [256, 256]
+        discriminator_dim: [256, 256]
+        generator_lr: 0.0002
+        discriminator_lr: 0.0002
+        discriminator_steps: 1
+        log_frequency: true
+        verbose: true
+      validation:
+        split: 0.2
+        early_stopping: true
+        patience: 50
+    
+    vae:
+      enabled: true
+      hyperparameters:
+        latent_dim: 128
+        encoder_layers: [512, 256, 128]
+        decoder_layers: [128, 256, 512]
+        epochs: 100
+        batch_size: 32
+        learning_rate: 0.001
+        beta: 1.0  # Para β-VAE
+        activation: "relu"
+        optimizer: "adam"
+      callbacks:
+        - early_stopping
+        - model_checkpoint
+        - reduce_lr_on_plateau
+    
+    copula:
+      enabled: true
+      type: "gaussian"  # o "vine", "student_t"
+      hyperparameters:
+        distribution: "norm"  # para marginales
+        default_distribution: "beta"  # fallback
+      correlation_method: "pearson"  # o "spearman", "kendall"
+    
+    bootstrap:   # baseline: weighted resampling of observed INE households (no SDV needed)
+      enabled: true
+      hyperparameters:
+        weight_column: "peso"
+
+    tvae:
+      enabled: false
+      hyperparameters:
+        epochs: 300
+        batch_size: 500
+        compress_dims: [128, 128]
+        decompress_dims: [128, 128]
+        embedding_dim: 128
+        loss_factor: 2
+    
+    timeseries_gan:
+      enabled: true
+      use_case: "transactions"
+      hyperparameters:
+        sequence_length: 30  # días
+        hidden_dim: 100
+        num_layers: 3
+        epochs: 500
+        learning_rate: 0.0001
+
+constraints:
+  business_rules:
+    # Reglas de negocio específicas
+    - name: "edad_minima"
+      column: "edad"
+      constraint: ">=18"
+    
+    - name: "saldo_positivo"
+      column: "saldo_cuenta"
+      constraint: ">=0"
+    
+    - name: "ratio_deuda_ingreso"
+      formula: "deuda_total / ingresos_anuales"
+      constraint: "<=0.4"  # Máximo 40% de endeudamiento
+    
+    - name: "coherencia_credito"
+      condition: "if tipo_credito == 'hipoteca' then importe_credito >= 50000"
+    
+    - name: "edad_jubilacion"
+      condition: "if situacion_laboral == 'jubilado' then edad >= 60"
+
+    # --- RiskSynth AI wealth rules (mirror data_config.yaml consistency_rules CR01-CR07) ---
+    - name: "risk_score_range"
+      column: "risk_tolerance_score"
+      constraint: ">=1 and <=10"
+
+    - name: "risk_category_from_score"          # CR01
+      condition: "risk_tolerance_category == bucket(risk_tolerance_score, {Conservative: [1,3], Moderate: [4,6], Aggressive: [7,8], Ultra-Aggressive: [9,10]})"
+
+    - name: "drawdown_within_band"               # CR02 (relaxed for EC08)
+      condition: "max_acceptable_drawdown_pct within band(risk_tolerance_category) +/- 2"
+      relaxable_by_edge_cases: ["EC08"]
+
+    - name: "horizon_bucket_from_years"          # CR03
+      condition: "investment_horizon_bucket == bucket(investment_horizon_years, {Short: [0,3), Medium: [3,7), Long: [7,inf)})"
+
+    - name: "no_retirement_goal_after_retirement" # CR04
+      condition: "if edad >= 67 then primary_investment_goal != 'Retirement'"
+
+    - name: "horizon_within_lifespan"            # CR05
+      condition: "investment_horizon_years <= 90 - edad"
+
+    - name: "surplus_floor_identity"             # CR06
+      condition: "investable_surplus_eur == max(0, raw_surplus_eur)"
+
+    - name: "preservation_short_horizon"         # CR07
+      condition: "if primary_investment_goal == 'Capital Preservation' then investment_horizon_years <= 5"
+
+    - name: "effective_risk_identity"
+      condition: "effective_risk_score == min(risk_tolerance_score, risk_capacity_score)"
+
+  statistical_constraints:
+    # Preservar distribuciones específicas del INE
+    - column: "provincia"
+      distribution: "categorical"
+      source: "INE_padron_2024"
+      preserve: true
+    
+    - column: "edad"
+      distribution: "normal"
+      params:
+        mean: 45.3
+        std: 18.7
+      preserve: true
+    
+    - column: "ingresos_anuales"
+      distribution: "lognormal"
+      params:
+        mu: 10.3
+        sigma: 0.5
+      preserve: true
+
+    # --- RiskSynth AI targets ---
+    # [EMPIRICAL] = EPF 2024 (data/processed/epf_processed.parquet); [ASSUMPTION] = design prior
+    - column: "net_income_annual_eur"
+      distribution: "empirical_quantiles"        # [EMPIRICAL]
+      params:
+        quantiles: {p10: 13200, p25: 19200, p50: 26400, p75: 43400, p90: 48000, p95: 67000}
+      tolerance_relative: 0.10                   # each synthetic quantile within +/-10%
+      preserve: true
+
+    - column: "raw_surplus_eur"
+      distribution: "empirical_quantiles"        # [EMPIRICAL]
+      params:
+        quantiles: {p05: -22700, p25: -5300, p50: 2700, p75: 10700, p95: 27100}
+        share_negative: 0.409
+      tolerance_absolute_eur: 1500
+      tolerance_share_negative_pp: 3.0
+      preserve: true
+
+    - column: "risk_tolerance_category"
+      distribution: "categorical"                # [ASSUMPTION]
+      params: {Conservative: 0.40, Moderate: 0.35, Aggressive: 0.18, Ultra-Aggressive: 0.07}
+      tolerance_pp: 2.0
+      preserve: true
+
+    - column: "esg_preference_level"
+      distribution: "categorical"                # [ASSUMPTION]
+      params: {"None": 0.40, "Low": 0.35, "High": 0.25}
+      tolerance_pp: 2.0
+      preserve: true
+
+    - column: "primary_investment_goal"
+      distribution: "conditional_categorical"    # [ASSUMPTION] P(goal | age band)
+      params_ref: "data_config.yaml#wealth_profile_schema.features.primary_investment_goal.generation.probabilities"
+      tolerance_pp: 3.0
+      preserve: true
+
+  # Expected dependence structure (Spearman rho, base population only)
+  dependency_constraints:
+    - {pair: ["risk_tolerance_score", "max_acceptable_drawdown_pct"], expected: "positive", min_rho: 0.80}
+    - {pair: ["edad", "risk_tolerance_score"], expected: "negative", max_rho: -0.10}
+    - {pair: ["edad", "investment_horizon_years"], expected: "negative", max_rho: -0.20}
+    - {pair: ["investment_horizon_years", "liquidity_need_pct"], expected: "negative", max_rho: -0.15}
+    - {pair: ["net_income_annual_eur", "investable_surplus_eur"], expected: "positive", min_rho: 0.30}
+    - {pair: ["risk_tolerance_score", "risk_capacity_score"], expected: "positive", min_rho: 0.10, max_rho: 0.70}
+      # tolerance and capacity must be related but not collinear, otherwise the edge cases cannot occur
+
+  regulatory_compliance:
+    # Normativa Banco de España
+    - name: "CIRBE_limits"
+      rule: "sum(creditos_activos) <= 5 * patrimonio_neto"
+    
+    - name: "scoring_minimo"
+      rule: "scoring_crediticio >= 300"
+    
+    - name: "ratio_solvencia"
+      rule: "patrimonio / activos >= 0.08"
+
+    # --- MiFID II suitability (see data_config.yaml#compliance.mifid2_suitability) ---
+    - name: "suitability_effective_risk"
+      rule: "effective_risk_score == min(risk_tolerance_score, risk_capacity_score)"
+
+    - name: "sustainability_preference_collected"
+      rule: "esg_preference_level is not null"
+
+    - name: "inconsistency_flagged"
+      rule: "profile_inconsistency_flag == any_violation(CR01..CR07)"
+
+post_processing:
+  # Ajustes finales a datos generados
+  rounding:
+    edad: 0  # entero
+    ingresos_anuales: -2  # centenas
+    saldo_cuenta: 2  # céntimos
+    importe_credito: -3  # miles
+    risk_tolerance_score: 0
+    risk_capacity_score: 0
+    effective_risk_score: 0
+    investment_horizon_years: 1
+    max_acceptable_drawdown_pct: 0
+    liquidity_need_pct: 0
+    investable_surplus_eur: -1     # decenas
+    raw_surplus_eur: -1
+
+  clipping:
+    edad: [18, 100]
+    ingresos_anuales: [0, 500000]
+    saldo_cuenta: [0, 1000000]
+    scoring_crediticio: [300, 900]
+    risk_tolerance_score: [1, 10]
+    risk_capacity_score: [1, 10]
+    investment_horizon_years: [0.5, 50]
+    max_acceptable_drawdown_pct: [5, 40]
+    liquidity_need_pct: [0, 100]
+    investable_surplus_eur: [0, 500000]
+    raw_surplus_eur: [-250000, 500000]
+
+  categorical_mapping:
+    provincia:
+      ensure_valid: true
+      allowed_values: ["Madrid", "Barcelona", "Valencia", "Sevilla", "Zaragoza"]
+    
+    nivel_estudios:
+      ensure_valid: true
+      allowed_values: ["sin_estudios", "primaria", "secundaria", "fp", "universitario"]
+
+    risk_tolerance_category:
+      ensure_valid: true
+      allowed_values: ["Conservative", "Moderate", "Aggressive", "Ultra-Aggressive"]
+
+    investment_horizon_bucket:
+      ensure_valid: true
+      allowed_values: ["Short", "Medium", "Long"]
+
+    esg_preference_level:
+      ensure_valid: true
+      allowed_values: ["None", "Low", "High"]
+
+    primary_investment_goal:
+      ensure_valid: true
+      allowed_values: ["Capital Preservation", "Retirement", "Wealth Growth", "Income"]
+
+  # Re-derive dependent columns after clipping/rounding so the identities still hold
+  recompute_after_clipping:
+    - risk_tolerance_category
+    - investment_horizon_bucket
+    - investable_surplus_eur
+    - risk_capacity_score
+    - effective_risk_score
+    - profile_inconsistency_flag
+
+# ---------------------------------------------------------------------------
+# RiskSynth AI profiling models (replace credit scoring as the primary use case).
+# They are trained on synthetic data and tested on held-out synthetic/real-like data (TSTR).
+# ---------------------------------------------------------------------------
+profiling_models:
+  default_task: "risk_category_classification"
+  tasks:
+    risk_category_classification:
+      target: "risk_tolerance_category"
+      type: "multiclass"
+      class_order: ["Conservative", "Moderate", "Aggressive", "Ultra-Aggressive"]
+      model: "xgboost"
+      hyperparameters:
+        n_estimators: 300
+        max_depth: 5
+        learning_rate: 0.05
+        subsample: 0.8
+        colsample_bytree: 0.8
+        objective: "multi:softprob"
+        eval_metric: "mlogloss"
+        early_stopping_rounds: 20
+      # Leakage guard: these columns are derived from the target
+      exclude_features:
+        - risk_tolerance_score
+        - max_acceptable_drawdown_pct
+        - effective_risk_score
+        - profile_inconsistency_flag
+        - edge_case_id
+        - edge_case_matches
+        - expected_robo_behavior
+      metrics: ["macro_f1", "quadratic_weighted_kappa", "balanced_accuracy"]
+      acceptance:
+        quadratic_weighted_kappa_min: 0.50
+
+    surplus_regression:
+      target: "investable_surplus_eur"
+      type: "regression"
+      model: "xgboost"
+      target_transform: "log1p"
+      exclude_features: ["raw_surplus_eur", "surplus_ratio", "risk_capacity_score", "effective_risk_score"]
+      metrics: ["mae", "r2"]
+
+    goal_classification:
+      target: "primary_investment_goal"
+      type: "multiclass"
+      model: "random_forest"
+      metrics: ["macro_f1"]
+
+scoring_models:
+  # LEGACY (schema 1.x, synth-bank-es credit risk). Kept so existing notebooks run;
+  # RiskSynth AI's primary models are in profiling_models.
+  status: "legacy"
+  default_model: "xgboost"
+  target_variable: "default_probability"
+
+  models:
+    logistic_regression:
+      enabled: true
+      hyperparameters:
+        penalty: "l2"
+        C: 1.0
+        solver: "lbfgs"
+        max_iter: 1000
+      features:
+        numerical: ["edad", "ingresos_anuales", "saldo_cuenta", "antiguedad_meses"]
+        categorical: ["provincia", "nivel_estudios", "situacion_laboral"]
+    
+    xgboost:
+      enabled: true
+      hyperparameters:
+        n_estimators: 100
+        max_depth: 6
+        learning_rate: 0.1
+        subsample: 0.8
+        colsample_bytree: 0.8
+        objective: "binary:logistic"
+        eval_metric: "auc"
+        early_stopping_rounds: 10
+      feature_importance: true
+      shap_values: true
+    
+    random_forest:
+      enabled: true
+      hyperparameters:
+        n_estimators: 200
+        max_depth: 10
+        min_samples_split: 20
+        min_samples_leaf: 10
+        max_features: "sqrt"
+        class_weight: "balanced"
+    
+    neural_network:
+      enabled: true
+      architecture:
+        layers: [128, 64, 32, 16]
+        activation: "relu"
+        dropout: 0.3
+        output_activation: "sigmoid"
+      training:
+        epochs: 50
+        batch_size: 32
+        learning_rate: 0.001
+        optimizer: "adam"
+        loss: "binary_crossentropy"
+
+feature_engineering:
+  demographic_features:
+    - edad
+    - provincia
+    - nivel_estudios
+    - situacion_laboral
+    - tipo_vivienda
+    - personas_hogar
+  
+  financial_features:
+    - ingresos_anuales
+    - ingresos_mensuales
+    - saldo_cuenta_corriente
+    - saldo_cuenta_ahorro
+    - importe_credito_total
+    - num_productos_activos
+  
+  behavioral_features:
+    - num_transacciones_mes
+    - importe_medio_transaccion
+    - num_devoluciones
+    - num_descubiertos
+    - ratio_ahorro_ingreso
+  
+  derived_features:
+    - name: "ratio_deuda_ingreso"
+      formula: "deuda_total / ingresos_anuales"
+    - name: "capacidad_ahorro"
+      formula: "ingresos_mensuales - gastos_medios"
+    - name: "estabilidad_ingresos"
+      formula: "std(ingresos_ultimos_12_meses) / mean(ingresos_ultimos_12_meses)"
+    - name: "scoring_comportamental"
+      formula: "weighted_sum(num_transacciones, saldo_medio, antiguedad)"
+
+  # --- RiskSynth AI (definitions: data_config.yaml#wealth_profile_schema) ---
+  wealth_profile_features:
+    - risk_tolerance_score
+    - risk_tolerance_category
+    - investment_horizon_years
+    - investment_horizon_bucket
+    - max_acceptable_drawdown_pct
+    - liquidity_need_pct
+    - investable_surplus_eur
+    - esg_preference_level
+    - primary_investment_goal
+
+  wealth_supporting_features:
+    - net_income_annual_eur
+    - household_expenses_annual_eur
+    - debt_service_annual_eur
+    - raw_surplus_eur
+    - surplus_ratio
+    - debt_service_to_income
+    - liquid_savings_eur
+    - main_residence_value_eur
+    - risk_capacity_score
+    - effective_risk_score
+    - profile_inconsistency_flag
+
+  edge_case_tags:
+    - edge_case_id
+    - edge_case_matches
+    - edge_case_origin
+    - is_edge_case
+    - expected_robo_behavior
+    - expected_capacity_override
+    - edge_case_assertion_pass
+
+evaluation_config:
+  statistical_tests:
+    - ks_test
+    - chi_square_test
+    - wasserstein_distance
+    - jensen_shannon_divergence
+  
+  ml_efficacy:
+    - tstr  # Train on Synthetic, Test on Real
+    - trts  # Train on Real, Test on Synthetic
+  
+  privacy_metrics:
+    - dcr  # Distance to Closest Record
+    - k_anonymity
+    - l_diversity
+  
+  business_metrics:
+    - credit_risk_distribution
+    - profitability_estimation
+    - regulatory_compliance_score
+    - risk_profile_distribution
+    - suitability_consistency_rate
+    - edge_case_coverage
+
+  # --- RiskSynth AI acceptance thresholds ---
+  population_scope:
+    fidelity_tests: "base population only (edge_case_origin != 'injected')"
+    constraint_tests: "all rows"
+    ml_efficacy: "all rows"
+
+  thresholds:
+    significance_alpha: 0.05
+    numerical:
+      ks_statistic_max: 0.10            # KS D statistic; p-values are uninformative at n > 50k
+      wasserstein_normalized:           # matches statistical_tests.py grading
+        excellent: 0.05
+        good: 0.10
+        acceptable: 0.20                # > 0.20 = poor -> fail
+    categorical:
+      jensen_shannon_max: 0.05
+      category_share_tolerance_pp: 2.0
+      chi_square_cramers_v_max: 0.10
+    correlation:
+      mean_abs_spearman_diff_max: 0.10
+      max_abs_spearman_diff_max: 0.25
+    constraints:
+      hard_rule_violation_rate_max: 0.0   # CR01-CR07 on base population
+      edge_case_relaxed_rules_only: true  # injected rows may break only their own relaxed_rules
+    edge_cases:
+      share_tolerance_pp: 0.5             # each profile within target_share +/- 0.5pp
+      min_rows_per_profile: 50
+      assertion_pass_rate_min: 1.0        # every expected_advisory_outcome.test_assertion holds
+    privacy:
+      dcr_5th_percentile_min_ratio: 1.0   # synthetic->real DCR p5 >= real->real holdout DCR p5
+      k_anonymity_min: 5
+      quasi_identifiers: ["edad", "sexo", "ccaa", "n_miembros"]
+
+model_versioning:
+  tracking: true
+  registry: "models/"
+  metadata:
+    - training_date
+    - data_version
+    - hyperparameters
+    - performance_metrics
+    - author
+  backup:
+    enabled: true
+    retention_days: 180
+
+# ---------------------------------------------------------------------------
+# Robo-advisory simulator (app/streamlit_app.py tab 3; src/risksynth/scoring/robo_advisor.py)
+# A transparent model-portfolio engine to test how profiles drive recommendations.
+# [ASSUMPTION] illustrative parameters, not an investment policy.
+# ---------------------------------------------------------------------------
+robo_advisor_simulator:
+  # Equity share of the invested (non-cash) sleeve for each risk score 1..10
+  equity_pct_by_score: [10, 18, 26, 34, 42, 50, 60, 70, 80, 90]
+  cash:
+    min_pct: 3
+    liquidity_need_factor: 0.5      # cash = max(min_pct, factor * liquidity_need_pct)
+    max_pct: 60
+  # Peak-to-trough loss per sleeve in a 2008-style stress, used for the drawdown guard
+  stress_loss: {equity: 0.50, fixed_income: 0.10, cash: 0.0}
+  # Share of the equity sleeve held in ESG-screened funds (SFDR art. 8/9)
+  esg_equity_share: {"None": 0.0, "Low": 0.5, "High": 1.0}
