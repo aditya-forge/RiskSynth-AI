@@ -1,16 +1,16 @@
 # RiskSynth AI - Streamlit production settings
-# Dark, high-contrast, flat theme. Viewers can still switch to light in the app menu;
-# the app picks matching chart colours either way.
+# Dark, high-contrast, sharp-edged theme. The portal draws its own header and picks
+# matching chart colours if a viewer switches to light.
 
 [theme]
 base = "dark"
-primaryColor = "#3987e5"
-backgroundColor = "#141414"
-secondaryBackgroundColor = "#1e1e1e"
-textColor = "#e6e6e6"
+primaryColor = "#1e88e5"
+backgroundColor = "#0e1117"
+secondaryBackgroundColor = "#161b22"
+textColor = "#e6edf3"
 font = "sans serif"
-baseRadius = "small"
-borderColor = "#2e2e2e"
+baseRadius = "none"
+borderColor = "#333842"
 showWidgetBorder = true
 
 [server]
@@ -22,3 +22,4 @@ gatherUsageStats = false
 
 [client]
 toolbarMode = "minimal"
+showSidebarNavigation = false

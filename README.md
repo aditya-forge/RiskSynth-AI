@@ -110,12 +110,15 @@ Every run writes a JSON report covering:
 streamlit run app/streamlit_app.py      # then open http://localhost:8501
 ```
 
-| Tab | Contents |
+| Page | Contents |
 |---|---|
-| Overview | Population figures, risk-tier mix against target, surplus distribution, edge-case cohort, capacity vs stated tolerance |
-| Generator | Runs the rule-based, bootstrap or SDV engine with a chosen size, risk mix, edge-case share and seed; CSV, Parquet and JSON downloads |
-| Advisory simulator | Model portfolio per client under three rules (stated tolerance only, plus capacity and liquidity, plus a drawdown limit) and the resulting advisor actions |
-| Fidelity & compliance | KS, Wasserstein and Jensen-Shannon tests against INE, correlation heatmaps, rule checks, downloadable HTML report |
+| Product Overview | Population figures, risk-tier mix against target, surplus distribution, edge-case cohort, capacity vs stated tolerance |
+| Solution Architecture | Pipeline, output schema, consistency rules, risk-capacity caps, edge-case catalogue and calibration status |
+| Live Generator | Runs the rule-based, bootstrap or SDV engine with a chosen size, risk mix, edge-case share and seed; CSV, Parquet and JSON downloads |
+| Advisory Simulator | Model portfolio per client under three rules (stated tolerance only, plus capacity and liquidity, plus a drawdown limit) and the resulting advisor actions |
+| Compliance & Fidelity | KS, Wasserstein and Jensen-Shannon tests against INE, correlation heatmaps, rule checks, downloadable HTML report |
+
+The portal uses Streamlit's multipage navigation with a shared header, theme and dataset selector. On an empty deployment, the overview and analysis pages offer a one-click 2,000-client bootstrap demo; use the Live Generator for a configured run.
 
 ### Reading CSV outputs
 
@@ -271,7 +274,9 @@ SDV is optional. Without it, the SDV methods raise `ImportError` and the related
 ## Project layout
 
 ```
-app/                      Streamlit app (settings in .streamlit/config.toml)
+app/                      Streamlit portal entry point (settings in .streamlit/config.toml)
+  portal/                 shared data access, theme, navigation and UI components
+  views/                  overview, architecture, generator, simulator and compliance pages
 Dockerfile                container image for Render / Cloud Run
 configs/                  data_config.yaml, model_config.yaml
 data/processed/           harmonised INE base (committed)
