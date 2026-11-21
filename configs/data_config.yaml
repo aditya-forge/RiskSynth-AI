@@ -1,0 +1,1084 @@
+# configs/data_config.yaml
+# RiskSynth AI - data pipeline configuration
+# (migrated from synth-bank-es; credit-risk sections kept for backward compatibility)
+#
+# Migration notes: docs/migration-notes.md
+# Pre-migration copy: archive/configs_pre_risksynth/data_config.yaml
+
+project:
+  name: "RiskSynth AI"
+  domain: "wealth_management_robo_advisory"
+  schema_version: "2.0.0"          # 1.x = synth-bank-es credit-risk schema
+  previous_name: "synth-bank-es"
+  reference_year: 2024             # ECV/EPF 2024 microdata
+
+data_sources:
+  ine:
+    base_url: "https://www.ine.es/jaxiT3/Tabla.htm"
+    datasets:
+      padron:
+        url: "https://www.ine.es/jaxiT3/files/t/es/csv_bdsc/2853.csv"
+        description: "Padrón municipal de habitantes"
+        update_frequency: "anual"
+      epf:
+        url: "https://www.ine.es/prodyser/microdatos.htm"
+        description: "Encuesta de Presupuestos Familiares"
+        update_frequency: "anual"
+      eff:
+        description: "Encuesta Financiera de las Familias"
+        source: "Banco de España"
+        url: "https://www.bde.es/bde/es/areas/estadis/Otras_estadistic/Encuesta_Financi/"
+        update_frequency: "trianual"
+  
+  banco_espana:
+    base_url: "https://www.bde.es/webbde/es/estadis/"
+    datasets:
+      tipos_interes:
+        description: "Tipos de interés TAE"
+        update_frequency: "mensual"
+      cirbe:
+        description: "Central de Información de Riesgos"
+        access: "restricted"
+
+# ---------------------------------------------------------------------------
+# INE source mapping - READ BY src/risksynth/ingest/ine.py
+# Semantics verified against the microdata on 2026-11-21.
+# Convention: output column (left) <- INE source column (right).
+# Raw INE columns are always preserved in the per-survey parquet files for audit.
+# ---------------------------------------------------------------------------
+ine_source_mapping:
+  # Raw microdata layout under data_pipeline.raw.path
+  raw_layout:
+    ecv:
+      dir: "datos_2024"
+      personas: "ECV_Tp_2024/CSV"            # P file: person data (16+)
+      hogares: "ECV_Th_2024/CSV"             # H file: household data (HY020 lives here)
+      registro_personas: "ECV_Tr_2024/CSV"   # R file: person register
+      registro_hogares: "ECV_Td_2024/CSV"    # D file: household register (DB040 region, DB090 weight)
+    epf:
+      dir: "datos_2024_epf"
+      hogar: "EPFhogar/CSV"
+    epa:
+      dir: "datos_3t25/CSV"
+      file: "EPA_2025T3.tab"
+
+  # When data/raw is absent, the processor rebuilds from this frozen copy of the
+  # schema-1.x parquet files (they still contain the raw INE columns).
+  legacy_snapshot_dir: "data/interim/legacy_v1_processed"
+
+  ecv:
+    weight_column: "PB040"                   # person cross-sectional weight
+    person_id: "PB030"
+    household_id_divisor: 100                # EU-SILC: household id = PB030 // 100
+    household_file_id: "HB030"
+    register_file_id: "DB030"
+    interview_year_column: "PB110"
+    birth_year_column: "PB140"               # YEAR OF BIRTH, not age
+    birth_year_top_code: 1938                # oldest cohort is top-coded (age >= 86)
+    columns:
+      sexo: "PB150"
+      nivel_estudios: "PE041"
+      situacion_laboral: "PL032"
+      ingresos_trabajo: "PY010G"             # gross employee cash income (kept for generator compatibility)
+      renta_disponible: "HY020"              # H file only
+      ccaa: "DB040"                          # D file only (already NUTS2, e.g. "ES30")
+    # Net person-level income components (EU-SILC "N" variables). PY021N (company car) is
+    # excluded because it is part of PY020N. This is NOT a substitute for HY020: it omits
+    # household-level income (HY040-HY110) and persons under 16.
+    personal_net_income_components:
+      [PY010N, PY020N, PY050N, PY080N, PY090N, PY100N, PY110N, PY120N, PY130N, PY140N]
+
+  epf:
+    weight_column: "FACTOR"
+    missing_value_codes: [-9]                # INE "no consta"; becomes NaN in every numeric column
+    columns:
+      ccaa: "CCAA"
+      n_miembros: "NMIEMB"
+      regimen_vivienda: "REGTEN"             # 2 = owner with mortgage (matches CAPITMENS coverage)
+      edad: "EDADSP"                         # head of household, exact age
+      sexo: "SEXOSP"
+      nivel_estudios: "ESTUDIOSSP"
+      situacion_laboral: "SITUACTSP"
+      dependent_children: "NHIJOSD"
+      employed_members: "NUMOCUP"
+      contract_type: "TIPOCONT"              # current/last job of the head; used only when situacion_laboral == ocupado
+    # Population-grossed expenditure: output = source / weight_column  (EUR / household / year)
+    grossed_up_expenditure:
+      gasto_total: "GASTOT"                  # total incl. imputed rent
+      gasto_monetario: "GASTMON"             # monetary only = household_expenses_annual_eur
+    expected_median_gasto_monetario_eur: [15000, 35000]   # sanity band (EPF 2024 ~ 22.8k)
+    income:
+      exact_monthly: "IMPEXAC"               # household net monthly income, exact
+      bracket: "INTERIN"
+      invalid_bracket_codes: [0]
+      # Bracket medians measured from IMPEXAC within each INTERIN code
+      bracket_impute_median:
+        1: 480
+        2: 800
+        3: 1210
+        4: 1700
+        5: 2200
+        6: 2700
+        7: 3620
+        8: 5584
+        9: 7700
+        10: 10120
+      bracket_bounds:
+        1:  [0, 499]
+        2:  [500, 999]
+        3:  [1000, 1499]
+        4:  [1500, 1999]
+        5:  [2000, 2499]
+        6:  [2500, 2999]
+        7:  [3000, 4999]
+        8:  [5000, 6999]
+        9:  [7000, 8999]
+        10: [9000, null]
+    debt_service:                            # monthly; negatives clipped to 0, NaN = no mortgage
+      principal: "CAPITMENS"
+      interest: "INTERESMENS"
+    main_residence_value: "VALOREST"
+    outstanding_mortgage: "CAPITPDTE"
+    # Note: IMPEXACSP / INTERINPSP are the MAIN EARNER's income (exact / bracket), not spending.
+
+  epa:
+    weight_column: "FACTOREL"
+    age_band_column: "EDAD1"                 # 5-year band lower bound, not exact age
+    columns:
+      sexo: "SEXO1"
+      ccaa: "CCAA"
+      situacion_laboral: "AOI"
+      nivel_estudios: "NFORMA"
+      ocupacion: "OCUP1"
+      sector: "ACT1"
+      contract_type: "DUCON1"
+    age_bands:                               # code -> [min, max]; null = open-ended
+      0: [0, 4]
+      5: [5, 9]
+      10: [10, 15]
+      16: [16, 19]
+      20: [20, 24]
+      25: [25, 29]
+      30: [30, 34]
+      35: [35, 39]
+      40: [40, 44]
+      45: [45, 49]
+      50: [50, 54]
+      55: [55, 59]
+      60: [60, 64]
+      65: [65, null]
+    # Representative age for the open band; computed at runtime as the weighted
+    # median age of ECV persons aged >= 65. The fallback is used when ECV is unavailable.
+    open_band_age_fallback: 75
+
+  known_issues:
+    - id: "ISSUE-01"
+      status: "resolved"
+      description: "ECV PB140 (year of birth) was mapped to 'edad'; EPA age bands were mixed into the same column."
+      resolution: "edad = PB110 - PB140 for ECV; EPA bands become midpoints with edad_min/edad_max/edad_precision."
+    - id: "ISSUE-02"
+      status: "resolved"
+      description: "Substring match 'IMPEXAC' mapped the main earner's income (IMPEXACSP, -9 sentinels) to 'gasto_total'."
+      resolution: "Exact-name mapping; gasto_total = GASTOT / FACTOR; -9 becomes NaN."
+    - id: "ISSUE-03"
+      status: "resolved"
+      description: "'gasto_monetario' (GASTMON) was population-grossed."
+      resolution: "gasto_monetario = GASTMON / FACTOR; raw GASTMON kept."
+    - id: "ISSUE-04"
+      status: "blocked_on_data"
+      description: "ECV HY020 is in the H file, which was never ingested."
+      resolution: "P->H join on PB030 // 100 = HB030 (and D on DB030) is implemented for raw input. The current repo has no data/raw and the legacy parquet never contained the H/D files, so renta_disponible and ECV ccaa stay null until the ECV_Th/ECV_Td files are placed in data/raw."
+    - id: "ISSUE-05"
+      status: "resolved"
+      description: "Surveys were concatenated with incompatible codes (sexo 1/2 vs 1/6, numeric vs NUTS2 regions, birth years vs ages)."
+      resolution: "Independent samples cannot be row-joined. combined_base is a schema-aligned stack: harmonized codes, survey weights (peso, peso_norm), and fuente as stratum."
+
+# Code harmonization across surveys - READ BY src/risksynth/ingest/ine.py
+harmonization:
+  sexo:                                      # output: 1 = male, 2 = female
+    ecv: {1: 1, 2: 2}
+    epf: {1: 1, 6: 2}
+    epa: {1: 1, 6: 2}
+  ccaa_ine_to_nuts2:                         # INE CCAA code -> NUTS2 (what generate_synthetic.py expects)
+    1: "ES61"    # Andalucía
+    2: "ES24"    # Aragón
+    3: "ES12"    # Asturias
+    4: "ES53"    # Baleares
+    5: "ES70"    # Canarias
+    6: "ES13"    # Cantabria
+    7: "ES41"    # Castilla y León
+    8: "ES42"    # Castilla-La Mancha
+    9: "ES51"    # Cataluña
+    10: "ES52"   # Comunitat Valenciana
+    11: "ES43"   # Extremadura
+    12: "ES11"   # Galicia
+    13: "ES30"   # Madrid
+    14: "ES62"   # Murcia
+    15: "ES22"   # Navarra
+    16: "ES21"   # País Vasco
+    17: "ES23"   # La Rioja
+    18: "ES63"   # Ceuta (EPF)
+    19: "ES64"   # Melilla (EPF)
+    51: "ES63"   # Ceuta (EPA)
+    52: "ES64"   # Melilla (EPA)
+  nivel_estudios:                            # -> demographics.education_level labels
+    ecv:                                     # PE041 (ISCED 2011; 500 = all tertiary in the Spanish file)
+      "000": "sin_estudios"
+      "100": "primaria"
+      "200": "secundaria"
+      "340": "secundaria"
+      "344": "secundaria"
+      "350": "fp"
+      "353": "fp"
+      "354": "fp"
+      "450": "fp"
+      "500": "universitario"
+    epf:                                     # ESTUDIOSSP. Codes 5-8 = tertiary (confirmed via ESTUDREDSP=4); 5 = FP superior, to verify in the EPF record layout
+      1: "sin_estudios"
+      2: "primaria"
+      3: "secundaria"
+      4: "secundaria"
+      5: "fp"
+      6: "universitario"
+      7: "universitario"
+      8: "universitario"
+    epa:                                     # NFORMA
+      AN: "sin_estudios"
+      P1: "sin_estudios"
+      P2: "primaria"
+      S1: "secundaria"
+      SG: "secundaria"
+      SP: "fp"
+      SU: "universitario"
+  situacion_laboral:                         # -> demographics.employment_status labels (+ inactive subtypes)
+    ecv:                                     # PL032
+      "1": "ocupado"
+      "2": "desempleado"
+      "3": "jubilado"
+      "4": "otro_inactivo"     # permanently disabled
+      "5": "estudiante"
+      "6": "otro_inactivo"     # domestic tasks
+      "7": "otro_inactivo"
+      "8": "otro_inactivo"
+    epf:                                     # SITUACTSP. 1-2 = active (confirmed via SITUREDSP=1); 3 = retired
+      1: "ocupado"
+      2: "desempleado"
+      3: "jubilado"
+      4: "otro_inactivo"
+      5: "otro_inactivo"
+      6: "otro_inactivo"
+      7: "otro_inactivo"
+    epa:                                     # AOI: EPA does not separate retirees or students among inactives
+      3: "ocupado"
+      4: "ocupado"
+      5: "desempleado"
+      6: "desempleado"
+      7: "inactivo"
+      8: "inactivo"
+      9: "inactivo"
+  contract_type:
+    epa: {1: "permanent", 6: "temporary"}    # DUCON1
+    epf: {1: "permanent", 2: "temporary"}    # TIPOCONT; inferred from 91% share of code 1 among working heads, to verify in the EPF record layout
+
+# combined_base.parquet: schema-aligned stack of the three surveys - READ BY src/risksynth/ingest/ine.py
+combined_base:
+  age_rule: "valid_age_range"                # name of the data_quality rule used to filter rows
+  columns:
+    - fuente
+    - peso
+    - peso_norm
+    - edad
+    - edad_min
+    - edad_max
+    - edad_precision
+    - sexo
+    - ccaa
+    - nivel_estudios
+    - situacion_laboral
+    - n_miembros
+    - regimen_vivienda
+    - dependent_children
+    - ingresos_trabajo
+    - renta_disponible
+    - renta_neta_personal_eur
+    - net_income_annual_eur
+    - gasto_total
+    - gasto_monetario
+    - debt_service_annual_eur
+    - main_residence_value_eur
+    - ocupacion
+    - sector
+    - contract_type
+
+data_pipeline:
+  raw:
+    path: "data/raw"
+    retention_days: 365
+  
+  interim:
+    path: "data/interim"
+    retention_days: 180
+  
+  processed:
+    path: "data/processed"
+    retention_days: 90
+  
+  synthetic:
+    path: "data/synthetic"
+    versioning: true
+    format: "csv"
+    compression: "gzip"
+
+data_quality:
+  validation_rules:
+    - name: "no_nulls_in_key_columns"
+      columns: ["client_id", "dni", "fecha_nacimiento"]
+      rule: "not_null"
+    
+    - name: "valid_age_range"
+      columns: ["edad"]
+      rule: "range"
+      min: 18
+      max: 100
+    
+    - name: "valid_income"
+      columns: ["ingresos_anuales"]
+      rule: "positive"
+    
+    - name: "valid_province"
+      columns: ["provincia"]
+      rule: "in_list"
+      values: ["Madrid", "Barcelona", "Valencia", "Sevilla", "Zaragoza"]
+
+    # --- RiskSynth AI wealth-profile rules ---
+    - name: "no_nulls_in_wealth_profile"
+      columns:
+        - risk_tolerance_score
+        - risk_tolerance_category
+        - investment_horizon_years
+        - investment_horizon_bucket
+        - max_acceptable_drawdown_pct
+        - liquidity_need_pct
+        - investable_surplus_eur
+        - esg_preference_level
+        - primary_investment_goal
+      rule: "not_null"
+
+    - name: "valid_risk_tolerance_score"
+      columns: ["risk_tolerance_score"]
+      rule: "range"
+      min: 1
+      max: 10
+      dtype: "int"
+
+    - name: "valid_risk_tolerance_category"
+      columns: ["risk_tolerance_category"]
+      rule: "in_list"
+      values: ["Conservative", "Moderate", "Aggressive", "Ultra-Aggressive"]
+
+    - name: "valid_investment_horizon"
+      columns: ["investment_horizon_years"]
+      rule: "range"
+      min: 0.5
+      max: 50
+
+    - name: "valid_horizon_bucket"
+      columns: ["investment_horizon_bucket"]
+      rule: "in_list"
+      values: ["Short", "Medium", "Long"]
+
+    - name: "valid_max_drawdown"
+      columns: ["max_acceptable_drawdown_pct"]
+      rule: "range"
+      min: 5
+      max: 40
+
+    - name: "valid_liquidity_need"
+      columns: ["liquidity_need_pct"]
+      rule: "range"
+      min: 0
+      max: 100
+
+    - name: "non_negative_investable_surplus"
+      columns: ["investable_surplus_eur"]
+      rule: "range"
+      min: 0
+      max: 500000
+
+    - name: "valid_esg_preference"
+      columns: ["esg_preference_level"]
+      rule: "in_list"
+      values: ["None", "Low", "High"]
+
+    - name: "valid_investment_goal"
+      columns: ["primary_investment_goal"]
+      rule: "in_list"
+      values: ["Capital Preservation", "Retirement", "Wealth Growth", "Income"]
+
+    - name: "category_matches_score"
+      columns: ["risk_tolerance_score", "risk_tolerance_category"]
+      rule: "derived_consistency"
+      reference: "wealth_profile_schema.features.risk_tolerance_score.categories"
+
+    - name: "bucket_matches_horizon"
+      columns: ["investment_horizon_years", "investment_horizon_bucket"]
+      rule: "derived_consistency"
+      reference: "wealth_profile_schema.features.investment_horizon_years.buckets"
+
+  outlier_detection:
+    method: "iqr"
+    threshold: 3.0
+    columns: ["ingresos_anuales", "saldo_cuenta", "importe_credito", "investable_surplus_eur", "raw_surplus_eur"]
+
+transformations:
+  encoding:
+    categorical_columns:
+      - provincia
+      - nivel_estudios
+      - situacion_laboral
+      - tipo_vivienda
+      - risk_tolerance_category
+      - investment_horizon_bucket
+      - esg_preference_level
+      - primary_investment_goal
+    method: "label"  # o "onehot"
+    # Ordinal encodings for wealth categoricals (order matters for models/metrics)
+    ordinal_columns:
+      risk_tolerance_category: ["Conservative", "Moderate", "Aggressive", "Ultra-Aggressive"]
+      investment_horizon_bucket: ["Short", "Medium", "Long"]
+      esg_preference_level: ["None", "Low", "High"]
+
+  scaling:
+    numerical_columns:
+      - ingresos_anuales
+      - saldo_cuenta
+      - importe_credito
+      - edad
+      - risk_tolerance_score
+      - investment_horizon_years
+      - max_acceptable_drawdown_pct
+      - liquidity_need_pct
+      - investable_surplus_eur
+    method: "standard"  # o "minmax", "robust"
+    # Heavy right tail (EPF P99 ~ 48.8k EUR); robust scaling after log1p
+    overrides:
+      investable_surplus_eur: {pre_transform: "log1p", method: "robust"}
+
+  feature_engineering:
+    derived_features:
+      - name: "ratio_deuda_ingreso"
+        formula: "deuda_total / ingresos_anuales"
+      - name: "antiguedad_cliente_años"
+        formula: "(fecha_actual - fecha_alta).days / 365"
+      - name: "scoring_simple"
+        formula: "ingresos_anuales * 0.3 - deuda_total * 0.7"
+      # --- RiskSynth AI (full specification in wealth_profile_schema) ---
+      - name: "edad"
+        formula: "PB110 - PB140"                   # ECV fix (interview year - birth year), see ISSUE-01
+        source: "ECV"
+      - name: "net_income_annual_eur"
+        formula: "12 * (IMPEXAC if IMPEXAC > 0 else INTERIN.impute_median)"
+        source: "EPF"
+      - name: "household_expenses_annual_eur"
+        formula: "GASTMON / FACTOR"
+        source: "EPF"
+      - name: "debt_service_annual_eur"
+        formula: "12 * (clip0(CAPITMENS) + clip0(INTERESMENS)) + annual_consumer_debt_payments"
+        source: "EPF + generator (consumer loans are not in EPF)"
+      - name: "raw_surplus_eur"
+        formula: "net_income_annual_eur - household_expenses_annual_eur - debt_service_annual_eur"
+      - name: "investable_surplus_eur"
+        formula: "max(0, raw_surplus_eur)"
+      - name: "debt_service_to_income"
+        formula: "debt_service_annual_eur / net_income_annual_eur"
+
+demographics:
+  # Distribución por provincias (INE 2024)
+  provinces:
+    Madrid:
+      population: 6779888
+      percentage: 14.3
+      avg_income: 35000
+    Barcelona:
+      population: 5743402
+      percentage: 12.1
+      avg_income: 32000
+    Valencia:
+      population: 2589312
+      percentage: 5.5
+      avg_income: 27000
+    Sevilla:
+      population: 1950219
+      percentage: 4.1
+      avg_income: 25000
+    Zaragoza:
+      population: 975896
+      percentage: 2.1
+      avg_income: 28000
+  
+  # Distribución por edad
+  age_distribution:
+    - range: [18, 25]
+      percentage: 12.0
+    - range: [26, 35]
+      percentage: 18.0
+    - range: [36, 45]
+      percentage: 22.0
+    - range: [46, 55]
+      percentage: 20.0
+    - range: [56, 65]
+      percentage: 15.0
+    - range: [66, 100]
+      percentage: 13.0
+  
+  # Distribución por nivel de estudios
+  education_level:
+    sin_estudios: 8.5
+    primaria: 15.0
+    secundaria: 30.0
+    fp: 20.0
+    universitario: 26.5
+  
+  # Distribución por situación laboral
+  employment_status:
+    ocupado: 65.0
+    desempleado: 12.0
+    jubilado: 18.0
+    estudiante: 5.0
+
+financial_profiles:
+  # DEPRECATED (schema 1.x): 3-level profiles from synth-bank-es.
+  # Superseded by wealth_profile_schema.features.risk_tolerance_score (4 categories).
+  # Kept read-only for backward compatibility; do not extend.
+  deprecated: true
+  superseded_by: "wealth_profile_schema"
+  conservative:
+    risk_tolerance: "low"
+    avg_savings_rate: 0.20
+    credit_usage: 0.30
+    investment_appetite: 0.10
+  
+  moderate:
+    risk_tolerance: "medium"
+    avg_savings_rate: 0.15
+    credit_usage: 0.50
+    investment_appetite: 0.30
+  
+  aggressive:
+    risk_tolerance: "high"
+    avg_savings_rate: 0.10
+    credit_usage: 0.70
+    investment_appetite: 0.60
+
+compliance:
+  gdpr:
+    anonymization_level: "high"
+    pii_fields:
+      - dni
+      - nombre
+      - apellidos
+      - email
+      - telefono
+      - direccion
+  
+  banco_espana:
+    cirbe_reporting: true
+    solvency_ratios: true
+    stress_testing: true
+
+  # Robo-advisory suitability (CNMV supervises investment advice in Spain)
+  mifid2_suitability:
+    references:
+      - "MiFID II Directive 2014/65/EU, Art. 25(2)"
+      - "Delegated Regulation (EU) 2017/565, Art. 54"
+      - "Delegated Regulation (EU) 2021/1253 (sustainability preferences)"
+      - "ESMA Guidelines on certain aspects of the MiFID II suitability requirements (2022)"
+    # Map each suitability dimension to the synthetic fields that represent it
+    dimension_mapping:
+      risk_tolerance: ["risk_tolerance_score", "risk_tolerance_category", "max_acceptable_drawdown_pct"]
+      ability_to_bear_losses: ["risk_capacity_score", "investable_surplus_eur", "liquidity_need_pct"]
+      investment_objectives: ["primary_investment_goal", "investment_horizon_years"]
+      sustainability_preferences: ["esg_preference_level"]
+    rules:
+      effective_risk: "min(risk_tolerance_score, risk_capacity_score)"
+      flag_inconsistent_profile: true   # see edge case EC08
+    disclaimer: "Synthetic data only. Not calibrated to any real client book; not investment advice."
+
+# ===========================================================================
+# RiskSynth AI - Wealth Management / Robo-Advisory schema (schema 2.0.0)
+# ---------------------------------------------------------------------------
+# Generation order (each feature may only depend on the ones before it):
+#   demographics -> net_income -> expenses -> debt_service -> raw/investable
+#   surplus -> primary_investment_goal -> investment_horizon_years ->
+#   risk_tolerance_score -> max_acceptable_drawdown_pct -> liquidity_need_pct ->
+#   esg_preference_level -> risk_capacity_score
+#
+# Calibration status:
+#   [EMPIRICAL]  = measured on data/processed/epf_processed.parquet (EPF 2024)
+#   [ASSUMPTION] = design prior, no INE source; must be calibrated (e.g. against
+#                  Banco de España EFF 2022 risk-attitude items) before production
+# ===========================================================================
+wealth_profile_schema:
+  unit_of_analysis: "household head (sustentador principal)"
+  currency: "EUR"
+  retirement_age: 67                 # statutory age in Spain from 2027
+  life_horizon_cap_age: 90           # horizon <= life_horizon_cap_age - edad
+
+  features:
+
+    investable_surplus_eur:
+      dtype: "float"
+      unit: "EUR / year"
+      description: "Annual net income left after household expenses and debt obligations; floored at 0."
+      formula: "max(0, net_income_annual_eur - household_expenses_annual_eur - debt_service_annual_eur)"
+      inputs:
+        net_income_annual_eur: "EPF: 12 * IMPEXAC, else 12 * INTERIN bracket median"
+        household_expenses_annual_eur: "EPF: GASTMON / FACTOR"
+        debt_service_annual_eur: "EPF: 12 * (CAPITMENS + INTERESMENS), plus generator consumer-loan payments"
+      companion_columns:
+        raw_surplus_eur: "Signed surplus before the floor. Keep it: it is what defines EC04."
+        surplus_ratio: "raw_surplus_eur / net_income_annual_eur"
+      empirical_reference:   # [EMPIRICAL] EPF 2024, n=19,333 households, unweighted
+        raw_surplus_quantiles_eur:
+          p01: -43400
+          p05: -22700
+          p10: -15000
+          p25: -5300
+          p50: 2700
+          p75: 10700
+          p90: 20000
+          p95: 27100
+          p99: 48800
+        share_negative_raw_surplus: 0.409       # FACTOR-weighted
+        median_raw_surplus_by_head_age_eur:
+          "18-34": 900
+          "35-49": 1300
+          "50-64": 2300
+          "65+": 4400
+        net_income_annual_quantiles_eur:
+          p10: 13200
+          p25: 19200
+          p50: 26400
+          p75: 43400
+          p90: 48000
+          p95: 67000
+        share_households_with_mortgage_payment: 0.206
+        dsti_among_mortgagors: {p50: 0.178, p90: 0.364, p95: 0.459}
+      known_bias: >
+        EPF under-reports income relative to its expenditure diary, so about 41% of households
+        show negative surplus. Option: set income_calibration_factor > 1.0 (calibrated against
+        ECV HY020 or AEAT data) before flooring. The default of 1.0 keeps the raw INE figures.
+      income_calibration_factor: 1.0
+      clip: [0, 500000]
+      rounding: -1                     # nearest 10 EUR
+
+    primary_investment_goal:
+      dtype: "categorical"
+      values: ["Capital Preservation", "Retirement", "Wealth Growth", "Income"]
+      description: "Main objective declared in the suitability questionnaire."
+      generation:
+        method: "conditional_categorical"
+        conditioned_on: "age_band"
+        # [ASSUMPTION] P(goal | age band); each row sums to 1.0
+        probabilities:
+          "18-34": {"Capital Preservation": 0.15, "Retirement": 0.15, "Wealth Growth": 0.60, "Income": 0.10}
+          "35-49": {"Capital Preservation": 0.15, "Retirement": 0.35, "Wealth Growth": 0.40, "Income": 0.10}
+          "50-64": {"Capital Preservation": 0.20, "Retirement": 0.50, "Wealth Growth": 0.15, "Income": 0.15}
+          "65+":   {"Capital Preservation": 0.45, "Retirement": 0.05, "Wealth Growth": 0.10, "Income": 0.40}
+        adjustments:
+          - when: "investable_surplus_eur == 0"
+            multiply: {"Wealth Growth": 0.5, "Capital Preservation": 1.5}
+            renormalize: true
+          - when: "edad >= retirement_age"
+            multiply: {"Retirement": 0.0}
+            renormalize: true
+
+    investment_horizon_years:
+      dtype: "float"
+      unit: "years"
+      range: [0.5, 50]
+      rounding: 1
+      description: "Time until the client expects to need the invested capital."
+      buckets:          # lower bound inclusive, upper bound exclusive
+        Short:  {min: 0.0, max: 3.0}
+        Medium: {min: 3.0, max: 7.0}
+        Long:   {min: 7.0, max: null}
+      bucket_column: "investment_horizon_bucket"
+      generation:
+        method: "goal_conditional"
+        by_goal:
+          "Retirement":           {formula: "max(1, retirement_age - edad) + normal(0, 1)"}
+          "Capital Preservation": {distribution: "uniform", params: {low: 0.5, high: 4.0}}
+          "Income":               {distribution: "triangular", params: {low: 2, mode: 5, high: 12}}
+          "Wealth Growth":        {distribution: "triangular", params: {low: 4, mode: 10, high: 30}}
+        cap: "life_horizon_cap_age - edad"
+
+    risk_tolerance_score:
+      dtype: "int"
+      range: [1, 10]
+      description: "Psychometric risk tolerance (willingness to take risk), 1 = minimum and 10 = maximum."
+      category_column: "risk_tolerance_category"
+      categories:       # inclusive score ranges
+        Conservative:     {min: 1, max: 3}
+        Moderate:         {min: 4, max: 6}
+        Aggressive:       {min: 7, max: 8}
+        Ultra-Aggressive: {min: 9, max: 10}
+      generation:
+        method: "latent_linear_then_quantile_map"
+        # Latent score z = sum(coef * term) + N(0, noise_sd); then rank-mapped to target_distribution.
+        # Term names are implemented in src/risksynth/engine/wealth_profile.py (TERMS); `expr` documents them.
+        intercept: 0.0
+        income_reference_eur: 26400      # [EMPIRICAL] EPF median net household income
+        terms:          # [ASSUMPTION] signs from the household-finance literature; magnitudes are design priors
+          age_centered_40:           {expr: "(edad - 40)", coef: -0.04}
+          log_income_rel_median:     {expr: "log(net_income_annual_eur / income_reference_eur)", coef: 0.60}
+          surplus_ratio:             {expr: "clip(surplus_ratio, -1, 1)", coef: 1.20}
+          university_education:      {expr: "nivel_estudios == 'universitario'", coef: 0.50}
+          unemployed:                {expr: "situacion_laboral == 'desempleado'", coef: -0.80}
+          retired:                   {expr: "situacion_laboral == 'jubilado'", coef: -0.40}
+          dependent_children:        {expr: "min(dependent_children, 3)", coef: -0.20}
+          goal_wealth_growth:        {expr: "primary_investment_goal == 'Wealth Growth'", coef: 0.80}
+          goal_capital_preservation: {expr: "primary_investment_goal == 'Capital Preservation'", coef: -1.00}
+          long_horizon:              {expr: "investment_horizon_bucket == 'Long'", coef: 0.40}
+        noise_sd: 0.9
+        target_distribution:   # [ASSUMPTION] calibrate against BdE EFF 2022
+          Conservative: 0.40
+          Moderate: 0.35
+          Aggressive: 0.18
+          Ultra-Aggressive: 0.07
+
+    max_acceptable_drawdown_pct:
+      dtype: "float"
+      unit: "% peak-to-trough loss of portfolio value"
+      range: [5, 40]
+      rounding: 0
+      description: "Largest temporary loss the client says they would tolerate without selling."
+      generation:
+        method: "category_band"
+        # Draw uniformly inside the band, shifted by the score's position within its category
+        bands:
+          Conservative:     {min: 5,  max: 10}
+          Moderate:         {min: 10, max: 20}
+          Aggressive:       {min: 20, max: 30}
+          Ultra-Aggressive: {min: 30, max: 40}
+        within_band_position: "(score - cat_min + U(0,1)) / (cat_max - cat_min + 1)"
+        noise_sd: 1.5
+        band_tolerance_pct: 2      # allowed overshoot outside band before a row is flagged
+
+    liquidity_need_pct:
+      dtype: "float"
+      unit: "% of investable assets that must stay available within 12 months"
+      range: [0, 100]
+      rounding: 0
+      description: "Share of the portfolio the client must be able to withdraw at short notice."
+      generation:
+        method: "goal_beta_plus_adjustments"
+        base_beta_by_goal:    # [ASSUMPTION] scaled x100
+          "Capital Preservation": {a: 2.0, b: 5.0}     # mean ~29%
+          "Income":               {a: 2.0, b: 6.0}     # mean ~25%
+          "Retirement":           {a: 1.5, b: 10.0}    # mean ~13%
+          "Wealth Growth":        {a: 1.5, b: 10.0}    # mean ~13%
+        additive_adjustments:
+          - {when: "situacion_laboral == 'desempleado'", add: 15}
+          - {when: "contract_type == 'temporary'", add: 8}
+          - {when: "investment_horizon_bucket == 'Short'", add: 10}
+          - {when: "dependent_children > 0", add: 5, per_unit_of: "dependent_children", max_units: 3}
+          - {when: "liquid_savings_eur < 3 * household_expenses_annual_eur / 12", add: 10}
+        clip: [0, 100]
+      thresholds:
+        liquidity_constrained: 50  # >= 50% marks a liquidity-constrained profile
+
+    esg_preference_level:
+      dtype: "categorical"
+      values: ["None", "Low", "High"]
+      description: "Sustainability preference under Delegated Regulation (EU) 2021/1253."
+      generation:
+        method: "ordinal_logit_then_quantile_map"
+        income_reference_eur: 26400
+        terms:            # [ASSUMPTION]
+          age_centered_40:       {expr: "(edad - 40)", coef: -0.03}
+          university_education:  {expr: "nivel_estudios == 'universitario'", coef: 0.60}
+          log_income_rel_median: {expr: "log(net_income_annual_eur / income_reference_eur)", coef: 0.20}
+        noise_sd: 1.0
+        target_distribution:   # [ASSUMPTION]
+          "None": 0.40
+          "Low": 0.35
+          "High": 0.25
+
+  supporting_features:
+
+    liquid_savings_eur:
+      dtype: "float"
+      formula: "saldo_cuenta_corriente + saldo_cuenta_ahorro"
+      source: "rule-based generator (generate_synthetic.py) account balances"
+      # INE surveys do not observe liquid savings. When no generator balances exist
+      # (SDV path, dry runs), the engine draws months-of-expenses from this model and
+      # records liquid_savings_source = "assumption_model".
+      fallback_model:   # [ASSUMPTION] calibrate against BdE EFF 2022 (deposits by income/age)
+        distribution: "lognormal"
+        median_months_of_expenses_by_surplus_ratio:
+          "<0": 1.0
+          "[0,0.10)": 2.5
+          "[0.10,0.25)": 4.0
+          ">=0.25": 6.0
+        sigma: 0.9
+
+    consumer_debt_service_annual_eur:
+      dtype: "float"
+      formula: "12 * generator personal-loan monthly payments"
+      source: "rule-based generator; 0 when absent. Added to EPF mortgage debt service."
+
+    debt_service_to_income:
+      dtype: "float"
+      formula: "debt_service_annual_eur / net_income_annual_eur"
+      thresholds:     # [EMPIRICAL] EPF mortgagor DSTI
+        elevated: 0.20
+        high: 0.35
+
+    risk_capacity_score:
+      dtype: "int"
+      range: [1, 10]
+      description: "Objective ability to bear losses (MiFID II). Additive points, clipped to [1, 10]."
+      points:
+        surplus_ratio:             {"<0": 0, "[0,0.10)": 1, "[0.10,0.25)": 2, ">=0.25": 3}
+        investment_horizon_bucket: {Short: 0, Medium: 1, Long: 2}
+        debt_service_to_income:    {">=0.35": 0, "[0.20,0.35)": 1, "<0.20": 2}
+        employment_stability:      {desempleado: 0, temporary: 1, jubilado: 1, permanent: 2}
+        liquidity_need_pct:        {">=50": 0, "<50": 1}
+      # How each situacion_laboral / contract_type combination resolves to an employment_stability key
+      employment_stability_classes:
+        ocupado_permanent: "permanent"
+        ocupado_temporary: "temporary"
+        ocupado_unknown_contract: "permanent"   # [ASSUMPTION] self-employed / no contract info; EPF heads are 91% permanent
+        jubilado: "jubilado"
+        desempleado: "desempleado"
+        estudiante: "desempleado"               # no labour income
+        otro_inactivo: "desempleado"
+        inactivo: "desempleado"                 # EPA inactive aged < inactive_retired_age
+      inactive_retired_age: 65                  # EPA 'inactivo' at or above this age counts as jubilado
+      clip: [1, 10]
+      # Hard caps applied after the points (lowest applicable cap wins).
+      # Each edge-case test_assertion below follows directly from these caps.
+      caps:
+        - {id: "CAP_NO_SURPLUS",      when: "investable_surplus_eur == 0", max: 5}
+        - {id: "CAP_HIGH_DSTI",       when: "debt_service_to_income >= 0.35", max: 5}
+        - {id: "CAP_NO_BUFFER",       when: "liquid_savings_eur < 3 * household_expenses_annual_eur / 12", max: 6}
+        - {id: "CAP_SHORT_HORIZON",   when: "investment_horizon_bucket == 'Short'", max: 6}
+        - {id: "CAP_HIGH_LIQUIDITY",  when: "liquidity_need_pct >= 50", max: 6}
+        - {id: "CAP_NEAR_RETIREMENT", when: "edad >= 55 and investment_horizon_years < 10", max: 7}
+
+    effective_risk_score:
+      dtype: "int"
+      formula: "min(risk_tolerance_score, risk_capacity_score)"
+
+    profile_inconsistency_flag:
+      dtype: "bool"
+      formula: "any consistency rule CR01-CR07 violated"
+
+  consistency_rules:     # hard rules for the base population (edge cases may relax them; see below)
+    - id: "CR01"
+      rule: "risk_tolerance_category consistent with risk_tolerance_score"
+    - id: "CR02"
+      rule: "max_acceptable_drawdown_pct within category band +/- band_tolerance_pct"
+    - id: "CR03"
+      rule: "investment_horizon_bucket consistent with investment_horizon_years"
+    - id: "CR04"
+      rule: "primary_investment_goal != 'Retirement' or edad < retirement_age"
+    - id: "CR05"
+      rule: "investment_horizon_years <= life_horizon_cap_age - edad"
+    - id: "CR06"
+      rule: "investable_surplus_eur == max(0, raw_surplus_eur)"
+    - id: "CR07"
+      rule: "primary_investment_goal != 'Capital Preservation' or investment_horizon_years <= 5"
+
+  # Repair applied by src/risksynth/engine/consistency.py, in this order.
+  # Downstream derived columns (bucket, category, capacity, effective risk) are recomputed afterwards.
+  enforcement:
+    order: ["CR06", "CR04", "CR07", "CR05", "CR03", "CR01", "CR02"]
+    repairs:
+      CR01: "recompute risk_tolerance_category from risk_tolerance_score"
+      CR02: "clip max_acceptable_drawdown_pct to category band +/- band_tolerance_pct"
+      CR03: "recompute investment_horizon_bucket from investment_horizon_years"
+      CR04: "resample primary_investment_goal with Retirement excluded, then redraw the horizon"
+      CR05: "cap investment_horizon_years at life_horizon_cap_age - edad (floor 0.5)"
+      CR06: "investable_surplus_eur = max(0, raw_surplus_eur)"
+      CR07: "cap investment_horizon_years at 5"
+    preservation_horizon_max_years: 5
+
+  # Stage-2 input resolution: how each row obtains the household-finance block.
+  input_resolution:
+    household_finance_block:              # must come from one coherent household (EPF)
+      - net_income_annual_eur
+      - household_expenses_annual_eur
+      - debt_service_annual_eur
+      - main_residence_value_eur
+      - n_miembros
+      - dependent_children
+    source_aliases:                       # engine input <- first existing column
+      household_expenses_annual_eur: ["household_expenses_annual_eur", "gasto_monetario"]
+    # HY020 is used as net income only when observed; it is never imputed. Person-level ECV
+    # income (renta_neta_personal_eur) is NOT subtracted from household expenses (unit mismatch).
+    observed_income_priority: ["net_income_annual_eur", "renta_disponible"]
+    donor_imputation:                     # hot-deck from EPF households for rows without the block
+      pool: "data/processed/epf_processed.parquet"
+      weight_column: "peso"
+      cells: [["age_band_10", "employment_group"], ["age_band_10"]]   # coarser fallback
+      provenance_column: "household_finance_source"   # observed | donor_epf
+
+# ===========================================================================
+# Edge-Case Profiles
+# ---------------------------------------------------------------------------
+# Purpose: stress-test robo-advisor suitability logic on profiles that are rare
+# or internally conflicting, where a naive "tolerance -> portfolio" mapping fails.
+#
+# Mechanics:
+#   * Every row is evaluated against every predicate. Matching rows get
+#     edge_case_ids (pipe-separated) and edge_case_origin = "natural".
+#   * If a profile's natural share is below target_share, the shortfall is
+#     injected via conditional sampling + rejection (edge_case_origin = "injected").
+#   * Injected rows are EXCLUDED from the fidelity tests (they are deliberately
+#     oversampled) but INCLUDED in the constraint and ML-utility tests.
+#   * Percentile thresholds come from the generated base population; the
+#     fallback values come from EPF 2024 [EMPIRICAL] and apply when the base is too small.
+# ===========================================================================
+edge_case_profiles:
+  enabled: true
+  total_target_share: 0.08               # overridable: run_stage2(edge_case_share=...) / --edge-case-share
+  min_base_population_for_percentiles: 5000
+  # Two concepts (implemented in src/risksynth/engine/edge_cases.py):
+  #   edge_case_matches  every profile whose predicate a row satisfies (natural prevalence;
+  #                      e.g. EC04 matches ~14% of rows, far above its 1% quota)
+  #   edge_case_id       the stress-test cohort: exactly round(target_share * N) rows per
+  #                      profile, filled with natural matches first and topped up by injection
+  tag_columns:
+    primary: "edge_case_id"              # cohort assignment (one id per row; NA outside the cohort)
+    matches: "edge_case_matches"         # pipe-joined ids of all satisfied predicates
+    origin: "edge_case_origin"           # natural | injected | none
+    flag: "is_edge_case"                 # row belongs to the cohort
+    behaviour: "expected_robo_behavior"  # expected_advisory_outcome.recommendation
+  injection:
+    method: "conditional_sampling_with_rejection"   # mutate the fewest fields of non-cohort rows
+    max_rejection_attempts: 100
+    on_failure: "warn_and_report_shortfall"
+    fill_order: "scarcest_natural_supply_first"
+  # Product minimums used by flag_minimum_investment (EC02 assertion)
+  robo_advisor_product:                  # [ASSUMPTION] typical Spanish robo-advisor minimums
+    min_initial_investment_eur: 1000
+    min_monthly_contribution_eur: 50
+
+  profiles:
+
+    - id: "EC01"
+      name: "HIGH_INCOME_LOW_LIQUIDITY"
+      description: "High earner with almost no liquid buffer (lifestyle creep, recent house purchase)."
+      predicate: "net_income_annual_eur >= {income_p90} and liquid_savings_eur < 3 * household_expenses_annual_eur / 12"
+      thresholds:
+        income_p90: {percentile: 90, of: "net_income_annual_eur", fallback: 48000}
+      target_share: 0.010
+      relaxed_rules: []
+      capacity_cap: "CAP_NO_BUFFER"
+      expected_advisory_outcome:
+        capacity_override: true
+        recommendation: "Build a 3-6 month emergency fund before risk assets; cap effective risk at Moderate until the buffer exists."
+        test_assertion: "effective_risk_score <= 6"   # CAP_NO_BUFFER
+
+    - id: "EC02"
+      name: "YOUNG_HIGH_RISK_LOW_CAPITAL"
+      description: "Young client with a high stated tolerance and little capital or surplus to invest."
+      # the long horizon is part of the profile, and the expected behaviour depends on it
+      predicate: "edad >= 18 and edad <= 30 and risk_tolerance_score >= 8 and liquid_savings_eur < 5000 and investable_surplus_eur < 2400 and investment_horizon_years >= 7"
+      target_share: 0.010
+      relaxed_rules: []
+      capacity_cap: null              # no cap: outcome is not capacity-driven
+      expected_advisory_outcome:
+        capacity_override: false
+        recommendation: "Aggressive allocation is suitable given the long horizon; use small recurring contributions; check product minimums."
+        test_assertion: "investment_horizon_bucket == 'Long' or flag_minimum_investment"
+
+    - id: "EC03"
+      name: "NEAR_RETIREE_AGGRESSIVE_GROWTH"
+      description: "Client within ~9 years of retirement seeking aggressive growth (exposed to sequence-of-returns risk)."
+      predicate: "edad >= 58 and edad <= 66 and primary_investment_goal in ['Wealth Growth', 'Retirement'] and risk_tolerance_category in ['Aggressive', 'Ultra-Aggressive'] and investment_horizon_years <= 9"
+      target_share: 0.010
+      relaxed_rules: []
+      capacity_cap: "CAP_NEAR_RETIREMENT"
+      expected_advisory_outcome:
+        capacity_override: true
+        recommendation: "Warn about sequence-of-returns risk; apply a de-risking glide path toward retirement."
+        test_assertion: "effective_risk_score <= 7"   # CAP_NEAR_RETIREMENT
+
+    - id: "EC04"
+      name: "NEGATIVE_SURPLUS_INVESTOR"
+      description: "Household spending exceeds net income yet the client wants to invest."
+      predicate: "raw_surplus_eur < 0 and risk_tolerance_score >= 5"
+      target_share: 0.010
+      relaxed_rules: []
+      capacity_cap: "CAP_NO_SURPLUS"
+      expected_advisory_outcome:
+        capacity_override: true
+        recommendation: "No new recurring contributions; review the budget and debt first."
+        test_assertion: "investable_surplus_eur == 0 and effective_risk_score <= 5"   # CAP_NO_SURPLUS
+
+    - id: "EC05"
+      name: "OVERLEVERAGED_RISK_SEEKER"
+      description: "Debt service at the top decile of mortgagors combined with high stated tolerance."
+      predicate: "debt_service_to_income >= {dsti_high} and risk_tolerance_score >= 7"
+      thresholds:
+        dsti_high: {percentile: 90, of: "debt_service_to_income", among: "debt_service_to_income > 0", fallback: 0.35}
+      target_share: 0.010
+      relaxed_rules: []
+      capacity_cap: "CAP_HIGH_DSTI"
+      expected_advisory_outcome:
+        capacity_override: true
+        recommendation: "Downgrade effective risk; consider paying down debt before investing."
+        test_assertion: "effective_risk_score <= 5"   # CAP_HIGH_DSTI
+
+    - id: "EC06"
+      name: "RETIREE_INCOME_HIGH_LIQUIDITY"
+      description: "Retiree living off the portfolio who needs high liquidity."
+      predicate: "edad >= 67 and primary_investment_goal == 'Income' and liquidity_need_pct >= 50"
+      target_share: 0.0075
+      relaxed_rules: []
+      capacity_cap: "CAP_HIGH_LIQUIDITY"
+      expected_advisory_outcome:
+        capacity_override: false
+        recommendation: "Income-oriented allocation with a high share of cash and short-duration bonds."
+        test_assertion: "effective_risk_score <= 6"   # CAP_HIGH_LIQUIDITY
+
+    - id: "EC07"
+      name: "SHORT_HORIZON_AGGRESSIVE"
+      description: "Needs the money within 3 years but asks for an aggressive allocation."
+      predicate: "investment_horizon_bucket == 'Short' and risk_tolerance_category in ['Aggressive', 'Ultra-Aggressive']"
+      target_share: 0.0075
+      relaxed_rules: []
+      capacity_cap: "CAP_SHORT_HORIZON"
+      expected_advisory_outcome:
+        capacity_override: true
+        recommendation: "Horizon overrides tolerance; allocate no more aggressively than Moderate."
+        test_assertion: "effective_risk_score <= 6"   # CAP_SHORT_HORIZON
+
+    - id: "EC08"
+      name: "INCONSISTENT_QUESTIONNAIRE"
+      description: "Says Ultra-Aggressive but would only accept a drawdown of 10% or less (contradictory answers)."
+      predicate: "risk_tolerance_category == 'Ultra-Aggressive' and max_acceptable_drawdown_pct <= 10"
+      target_share: 0.005
+      relaxed_rules: ["CR02"]          # intentionally violates the drawdown band
+      capacity_cap: null              # no cap: outcome is not capacity-driven
+      expected_advisory_outcome:
+        capacity_override: false
+        recommendation: "Flag for re-profiling; use the more conservative of the two signals."
+        test_assertion: "profile_inconsistency_flag == True"
+
+    - id: "EC09"
+      name: "ASSET_RICH_CASH_POOR"
+      description: "Older owner of a high-value home with no investable surplus (common in Spain)."
+      predicate: "edad >= 60 and main_residence_value_eur >= {home_value_p90} and investable_surplus_eur == 0"
+      thresholds:
+        home_value_p90: {percentile: 90, of: "main_residence_value_eur", fallback: 300000}
+      target_share: 0.010
+      relaxed_rules: []
+      capacity_cap: "CAP_NO_SURPLUS"
+      expected_advisory_outcome:
+        capacity_override: true
+        recommendation: "Illiquid wealth does not count as risk capacity; keep the financial portfolio conservative."
+        test_assertion: "effective_risk_score <= 5"   # CAP_NO_SURPLUS
