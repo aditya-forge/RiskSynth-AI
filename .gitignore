@@ -1,0 +1,40 @@
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.eggs/
+
+# --- Environments & secrets ---------------------------------------------------
+.env
+.venv/
+venv/
+.streamlit/secrets.toml
+
+# --- Tooling caches -----------------------------------------------------------
+.pytest_cache/
+.mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
+
+# --- Data: raw microdata and runtime outputs ---------------------------------
+# data/processed/*.parquet IS versioned (needed to generate without INE raw files)
+data/raw/
+data/interim/
+data/synthetic/*
+!data/synthetic/.gitkeep
+
+# --- Runtime artifacts ---------------------------------------------------------
+logs/
+reports/
+models/*.pkl
+*.pkl
+
+# --- OS / editors ----------------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
