@@ -41,13 +41,28 @@ from risksynth.scoring import robo_advisor  # noqa: E402
 SYNTH_DIR = SYNTHETIC_DIR
 RUNS_DIR = SYNTH_DIR / "app_runs"
 
-# Palette (validated with the dataviz validator, light surface)
 TIER_ORDER = ["Conservative", "Moderate", "Aggressive", "Ultra-Aggressive"]
-TIER_COLORS = ["#86b6ef", "#3987e5", "#1c5cab", "#0d366b"]          # ordinal blue ramp
-SERIES = ["#2a78d6", "#eb6834", "#1baf7a"]                          # categorical slots 1-3
-SEQ_RANGE = ["#cde2fb", "#0d366b"]
-DIVERGING = ["#e34948", "#f0efec", "#2a78d6"]
-INK, INK_2, GRID = "#161616", "#5c5c5c", "#ececec"
+
+# Chart and UI colours per theme. Chart palettes were checked for colour-blind separation
+# and contrast against each theme's background (dark: #141414, light: #ffffff).
+THEMES = {
+    "dark": {
+        "tiers": ["#184f95", "#2a78d6", "#5598e7", "#9ec5f4"],    # ordinal blue ramp, brighter = riskier
+        "series": ["#3987e5", "#d95926", "#199e70"],              # categorical slots 1-3
+        "seq": ["#104281", "#b7d3f6"],
+        "div": ["#e66767", "#383835", "#3987e5"],
+        "ink": "#e6e6e6", "ink2": "#9a9a9a", "grid": "#262626", "axis": "#3a3a3a",
+        "rule": "#2e2e2e", "line": "#2a2a2a", "link": "#555555", "surface": "#141414", "accent": "#3987e5",
+    },
+    "light": {
+        "tiers": ["#86b6ef", "#3987e5", "#1c5cab", "#0d366b"],
+        "series": ["#2a78d6", "#eb6834", "#1baf7a"],
+        "seq": ["#cde2fb", "#0d366b"],
+        "div": ["#e34948", "#f0efec", "#2a78d6"],
+        "ink": "#161616", "ink2": "#5c5c5c", "grid": "#ececec", "axis": "#cfcfcf",
+        "rule": "#d6d6d6", "line": "#e4e4e4", "link": "#b9b9b9", "surface": "#ffffff", "accent": "#2a78d6",
+    },
+}
 
 EC_SHORT = {"EC01": "High income, low liquidity", "EC02": "Young, high risk, low capital",
             "EC03": "Near-retiree, aggressive", "EC04": "Negative surplus investor",
@@ -57,29 +72,35 @@ EC_SHORT = {"EC01": "High income, low liquidity", "EC02": "Young, high risk, low
 
 st.set_page_config(page_title="RiskSynth AI", page_icon=":material/monitoring:", layout="wide")
 
+# Dark is the configured base theme (.streamlit/config.toml); follow the viewer if they switch
+THEME = "light" if getattr(getattr(st.context, "theme", None), "type", None) == "light" else "dark"
+P = THEMES[THEME]
+TIER_COLORS, SERIES, SEQ_RANGE, DIVERGING = P["tiers"], P["series"], P["seq"], P["div"]
+INK, INK_2, GRID, SURFACE = P["ink"], P["ink2"], P["grid"], P["surface"]
+
 st.markdown(f"""
 <style>
   html, body, [class*="css"] {{ font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }}
   .block-container {{ padding-top: 1.6rem; padding-bottom: 3rem; max-width: 1440px; }}
   .rs-brand {{ font-size: 21px; font-weight: 650; letter-spacing: -0.015em; color: {INK}; line-height: 1.2; }}
-  .rs-brand b {{ color: #2a78d6; font-weight: 650; }}
+  .rs-brand b {{ color: {P["accent"]}; font-weight: 650; }}
   .rs-sub {{ color: {INK_2}; font-size: 13px; margin-top: 2px; }}
   .rs-label {{ font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: {INK_2};
               margin: 18px 0 6px 0; font-weight: 600; }}
   .rs-note {{ color: {INK_2}; font-size: 12.5px; }}
-  .rs-kpi {{ border-top: 1px solid #d6d6d6; padding-top: 10px; margin-bottom: 14px; }}
+  .rs-kpi {{ border-top: 1px solid {P["rule"]}; padding-top: 10px; margin-bottom: 14px; }}
   .rs-kpi-label {{ font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: {INK_2}; font-weight: 600; }}
   .rs-kpi-value {{ font-size: 25px; font-weight: 500; font-variant-numeric: tabular-nums; color: {INK};
                   line-height: 1.35; margin-top: 2px; }}
   .rs-kpi-note {{ font-size: 12px; color: {INK_2}; min-height: 16px; }}
-  .stTabs [data-baseweb="tab-list"] {{ gap: 28px; border-bottom: 1px solid #e4e4e4; }}
+  .stTabs [data-baseweb="tab-list"] {{ gap: 28px; border-bottom: 1px solid {P["line"]}; }}
   .stTabs [data-baseweb="tab"] {{ font-size: 14px; font-weight: 550; padding: 10px 0; }}
   dl.rs-facts {{ display: grid; grid-template-columns: max-content 1fr; gap: 5px 18px; font-size: 13.5px; margin: 0; }}
   dl.rs-facts dt {{ color: {INK_2}; }}
   dl.rs-facts dd {{ margin: 0; font-weight: 550; font-variant-numeric: tabular-nums; }}
   .rs-action {{ border-left: 3px solid #d03b3b; padding: 3px 10px; margin: 5px 0; font-size: 13.5px; }}
   .rs-action.ok {{ border-left-color: #0ca30c; }}
-  .rs-expect {{ border: 1px solid #e4e4e4; padding: 10px 12px; font-size: 13.5px; margin-top: 10px; }}
+  .rs-expect {{ border: 1px solid {P["line"]}; padding: 10px 12px; font-size: 13.5px; margin-top: 10px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -140,8 +161,8 @@ def rel(path: Path) -> str:
 def styled(chart, height: int = 260):
     return (chart.properties(height=height)
             .configure_view(stroke=None)
-            .configure_axis(labelColor=INK_2, titleColor=INK_2, gridColor=GRID, domainColor="#cfcfcf",
-                            tickColor="#cfcfcf", labelFontSize=11, titleFontSize=11, titleFontWeight=500)
+            .configure_axis(labelColor=INK_2, titleColor=INK_2, gridColor=GRID, domainColor=P["axis"],
+                            tickColor=P["axis"], labelFontSize=11, titleFontSize=11, titleFontWeight=500)
             .configure_legend(labelColor=INK, titleColor=INK_2, labelFontSize=11, titleFontSize=11,
                               orient="top", direction="horizontal", symbolType="square")
             .configure_title(fontSize=13, fontWeight=600, color=INK, anchor="start", subtitleColor=INK_2,
@@ -239,7 +260,7 @@ def render_overview(df: pd.DataFrame) -> None:
         labels = base.mark_text(align="left", dx=8, color=INK, fontSize=11).encode(
             x="label_x:Q", text=alt.Text("actual:Q", format=".1f"))
         show((bars + ticks + labels).properties(
-            title=alt.Title("Risk tolerance tiers", subtitle="Bars: actual share. Black ticks: configured target mix")), height=300)
+            title=alt.Title("Risk tolerance tiers", subtitle="Bars: actual share. Ticks: configured target mix")), height=300)
     with c2:
         s = df["raw_surplus_eur"].dropna()
         lo, hi = s.quantile([0.01, 0.99])
@@ -266,7 +287,7 @@ def render_overview(df: pd.DataFrame) -> None:
             order = sorted(tab["profile"].unique())
             targets = pd.DataFrame([{"profile": f"{p['id']}  {EC_SHORT[p['id']]}", "target": 100 * p["target_share"]}
                                     for p in cfg["edge_case_profiles"]["profiles"]])
-            bars = alt.Chart(tab).mark_bar(stroke="white", strokeWidth=2).encode(
+            bars = alt.Chart(tab).mark_bar(stroke=SURFACE, strokeWidth=2).encode(
                 y=alt.Y("profile:N", sort=order, title=None, axis=alt.Axis(labelLimit=260)),
                 x=alt.X("share:Q", stack="zero", title="% of all clients"),
                 color=alt.Color("edge_case_origin:N", title="Origin", scale=alt.Scale(
@@ -284,7 +305,7 @@ def render_overview(df: pd.DataFrame) -> None:
     with c4:
         grid = (df.groupby(["risk_tolerance_score", "effective_risk_score"]).size()
                 .rename("clients").reset_index())
-        heat = alt.Chart(grid).mark_rect(stroke="white", strokeWidth=1).encode(
+        heat = alt.Chart(grid).mark_rect(stroke=SURFACE, strokeWidth=1).encode(
             x=alt.X("risk_tolerance_score:O", title="Stated tolerance (1-10)", axis=alt.Axis(labelAngle=0)),
             y=alt.Y("effective_risk_score:O", title="Effective risk (1-10)", sort="descending"),
             color=alt.Color("clients:Q", title="Clients", scale=alt.Scale(range=SEQ_RANGE, type="sqrt")),
@@ -513,7 +534,7 @@ def render_advisory(df: pd.DataFrame, rec: pd.DataFrame) -> None:
             vals = [r[f"{pre}_equity_pct"], r[f"{pre}_fixed_income_pct"], r[f"{pre}_cash_pct"]]
             rows += [{"step": label, "sleeve": s, "pct": float(v), "order": i} for i, (s, v) in enumerate(zip(SLEEVES, vals))]
         alloc = pd.DataFrame(rows)
-        bars = alt.Chart(alloc).mark_bar(height=30, stroke="white", strokeWidth=2).encode(
+        bars = alt.Chart(alloc).mark_bar(height=30, stroke=SURFACE, strokeWidth=2).encode(
             y=alt.Y("step:N", title=None, sort=[s for s, _ in steps], axis=alt.Axis(labelLimit=220)),
             x=alt.X("pct:Q", stack="zero", title="% of portfolio", scale=alt.Scale(domain=[0, 100])),
             color=alt.Color("sleeve:N", title=None, scale=alt.Scale(domain=SLEEVES, range=SERIES)),
@@ -545,9 +566,9 @@ def render_advisory(df: pd.DataFrame, rec: pd.DataFrame) -> None:
     names = {"recommended": "Recommended (3)", "naive": "Tolerance only (1)", "capacity": "Capacity (2)"}
     long["allocation"] = long["allocation"].map(names)
     order = list(agg.sort_values("group")["label"])
-    rule = alt.Chart(agg).mark_rule(color="#b9b9b9", strokeWidth=2).encode(
+    rule = alt.Chart(agg).mark_rule(color=P["link"], strokeWidth=2).encode(
         y=alt.Y("label:N", sort=order, title=None, axis=alt.Axis(labelLimit=280)), x="recommended:Q", x2="naive:Q")
-    dots = alt.Chart(long).mark_circle(size=110, opacity=1, stroke="white", strokeWidth=2).encode(
+    dots = alt.Chart(long).mark_circle(size=110, opacity=1, stroke=SURFACE, strokeWidth=2).encode(
         y=alt.Y("label:N", sort=order), x=alt.X("equity:Q", title="Mean equity share, % of portfolio"),
         color=alt.Color("allocation:N", title=None, scale=alt.Scale(   # legend in step order; colour fixed per step
             domain=[names["naive"], names["capacity"], names["recommended"]],
@@ -602,7 +623,7 @@ def heatmap(matrix: pd.DataFrame, title: str, subtitle: str, domain: float) -> a
         x=alt.X("col_label:N", sort=order, title=None,
                 axis=alt.Axis(labelAngle=-35, labelOverlap=False, labelLimit=140)),
         y=alt.Y("row_label:N", sort=order, title=None, axis=alt.Axis(labelOverlap=False)))
-    rect = base.mark_rect(stroke="white", strokeWidth=1).encode(
+    rect = base.mark_rect(stroke=SURFACE, strokeWidth=1).encode(
         # interpolate in Lab so the midpoint stays neutral grey (default HCL drifts through pink/purple)
         color=alt.Color("value:Q", title=None, scale=alt.Scale(domain=[-domain, 0, domain], range=DIVERGING,
                                                                interpolate="lab", clamp=True)),
@@ -692,6 +713,6 @@ else:
     with tab_fidelity:
         render_fidelity(active, mtime)
 
-st.markdown("<div class='rs-note' style='margin-top:36px;border-top:1px solid #e4e4e4;padding-top:10px'>"
+st.markdown(f"<div class='rs-note' style='margin-top:36px;border-top:1px solid {P['line']};padding-top:10px'>"
             "Synthetic data only. Not calibrated to any real client book; not investment advice.</div>",
             unsafe_allow_html=True)

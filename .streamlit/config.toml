@@ -1,14 +1,21 @@
-# RiskSynth AI - Streamlit theme: high-contrast, flat, financial-terminal light UI
+# RiskSynth AI - Streamlit production settings
+# Dark, high-contrast, flat theme. Viewers can still switch to light in the app menu;
+# the app picks matching chart colours either way.
+
 [theme]
-base = "light"
-primaryColor = "#2a78d6"
-backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f6f7f9"
-textColor = "#161616"
+base = "dark"
+primaryColor = "#3987e5"
+backgroundColor = "#141414"
+secondaryBackgroundColor = "#1e1e1e"
+textColor = "#e6e6e6"
 font = "sans serif"
 baseRadius = "small"
-borderColor = "#e4e4e4"
+borderColor = "#2e2e2e"
 showWidgetBorder = true
+
+[server]
+# No email prompt and no browser launch on startup (servers, containers, CI)
+headless = true
 
 [browser]
 gatherUsageStats = false
