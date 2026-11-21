@@ -14,6 +14,7 @@ This is synthetic data for development and testing. It is not calibrated to any 
 - [Usage](#usage)
 - [Edge-case scenarios](#edge-case-scenarios)
 - [Calibration status](#calibration-status)
+- [Deployment](#deployment)
 - [Development](#development)
 - [Project layout](#project-layout)
 
@@ -106,7 +107,7 @@ Every run writes a JSON report covering:
 ### Streamlit app
 
 ```bash
-streamlit run app/streamlit_app.py
+streamlit run app/streamlit_app.py      # then open http://localhost:8501
 ```
 
 | Tab | Contents |
@@ -185,6 +186,70 @@ Known limitations:
 - **Uncalibrated liquid savings.** Generator account balances (median around EUR 37k-41k) and the fallback model (median around EUR 4.5k) disagree, and neither is calibrated yet.
 - **Inferred EPF codes.** Education code 5 (vocational) and the EPF contract-type codes were inferred from data shares; check them against INE's EPF record layout.
 
+## Deployment
+
+The app runs on Streamlit Community Cloud or in any Docker host. Both use the committed INE base in `data/processed/` (`combined_base.parquet` for the rule-based engine and the fidelity checks, `epf_processed.parquet` for the bootstrap sampler), so no data download is needed. Production settings live in `.streamlit/config.toml`:
+
+- dark theme;
+- headless mode, so there is no email prompt and no browser launch on startup;
+- usage statistics turned off.
+
+Generated datasets are written to the instance's disk and are lost when it restarts; use the download buttons to keep them.
+
+### Streamlit Community Cloud
+
+1. Sign in at [share.streamlit.io](https://share.streamlit.io) with GitHub and choose **Create app**.
+2. Repository `aditya-forge/RiskSynth-AI`, branch `main`, main file path **`app/streamlit_app.py`**. The app lives in `app/`, not at the repository root.
+3. Under advanced settings pick Python 3.12, then deploy.
+
+Community Cloud installs `requirements.txt`. The app finds the `risksynth` package in `src/` on its own, so no extra build step is needed. The free tier has about 1 GB of memory; the app already caps in-app rule-based runs at 5,000 rows.
+
+### Docker: Render or Google Cloud Run
+
+The `Dockerfile` builds a production image:
+
+- Python 3.12 slim base;
+- runs as a non-root user;
+- health check on `/_stcore/health`;
+- listens on `$PORT` (8501 by default).
+
+```bash
+docker build -t risksynth .
+docker run -p 8501:8501 risksynth            # http://localhost:8501
+```
+
+**Render.**
+1. Create a new Web Service from the repository; Render detects the `Dockerfile`.
+2. Set the health check path to `/_stcore/health`.
+3. Pick an instance with at least 1 GB of memory.
+
+Render sets `PORT` itself.
+
+**Google Cloud Run.**
+
+```bash
+gcloud run deploy risksynth \
+  --source . --region europe-west1 \
+  --memory 2Gi --port 8080 \
+  --timeout 3600 --session-affinity \
+  --allow-unauthenticated
+```
+
+Cloud Run sets `PORT=8080`. Streamlit keeps a websocket open per browser session:
+- `--timeout 3600` keeps sessions alive for up to an hour;
+- `--session-affinity` keeps each viewer on the same instance.
+
+### Continuous integration
+
+`.github/workflows/ci.yml` runs on every push and pull request to `main`. On Python 3.11 and 3.12 (Ubuntu) it:
+1. checks out the code;
+2. installs the package with `pip install -e ".[dev]"`;
+3. runs the fast test suite, `pytest tests/ -m "not slow"`.
+
+The suite checks behaviour: ingestion, the profile engine and its rules, the edge-case cohort, generator alignment and console encoding. It does not run a linter or type checker. The slow tests (the CLI subprocess and the Streamlit app) are excluded from CI; run them locally with `pytest`.
+
+To block merges that break the tests, add both `Tests (Python 3.11)` and `Tests (Python 3.12)` as required status checks in the repository's branch protection settings.
+
 ## Development
 
 ```bash
@@ -201,12 +266,13 @@ pytest --cov=risksynth       # with pytest-cov
 | `tests/test_generators_alignment.py` | Mortgage and debt alignment with EPF, balance-derived credit fields, bootstrap sampler, behaviour without SDV, CSV reading, console encoding |
 | `tests/test_streamlit_app.py` | App renders all tabs; form validation |
 
-SDV is optional. Without it, the SDV methods raise `ImportError` and the related test checks exactly that. CI runs the fast suite on every push (`.github/workflows/ci.yml`).
+SDV is optional. Without it, the SDV methods raise `ImportError` and the related test checks exactly that. CI runs the fast suite on every push and pull request to `main`; see [Continuous integration](#continuous-integration).
 
 ## Project layout
 
 ```
-app/                      Streamlit app (theme in .streamlit/config.toml)
+app/                      Streamlit app (settings in .streamlit/config.toml)
+Dockerfile                container image for Render / Cloud Run
 configs/                  data_config.yaml, model_config.yaml
 data/processed/           harmonised INE base (committed)
 data/raw/, data/interim/  INE microdata and local rebuild snapshot (not committed)
