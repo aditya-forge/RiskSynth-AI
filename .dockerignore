@@ -1,0 +1,24 @@
+# Keep the build context small: only what the app image needs
+.git
+.github
+.venv
+venv
+.env
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+htmlcov
+
+archive
+docs
+tests
+notebooks
+data/raw
+data/interim
+data/synthetic
+reports
+logs
+*.pkl
+Dockerfile
+.dockerignore
