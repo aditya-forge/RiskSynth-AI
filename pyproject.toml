@@ -1,0 +1,87 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "risksynth-ai"
+version = "2.0.0"                      # matches configs schema_version 2.0.0
+description = "RiskSynth AI: synthetic client risk profiles for robo-advisory and wealth management, calibrated on INE microdata"
+readme = "README.md"
+authors = [{ name = "RiskSynth AI contributors" }]
+license = { text = "MIT" }
+requires-python = ">=3.10"
+keywords = ["synthetic-data", "robo-advisor", "mifid-ii", "wealth-management", "ine", "risk-profiling"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Intended Audience :: Science/Research",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+dependencies = [
+    "pandas>=2.2",
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pyarrow>=14",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+# Streamlit UI (app/streamlit_app.py)
+app = [
+    "streamlit>=1.46",
+    "altair>=5.4",
+]
+# Generative stage-1 models (CTGAN / Gaussian copula / TVAE). Optional: the Sampler and
+# rule-based engines work without it. Check SDV's supported Python versions before installing.
+sdv = [
+    "sdv>=1.9",
+]
+# Legacy evaluation module (src/risksynth/evaluation/statistical_tests.py)
+legacy-eval = [
+    "loguru>=0.7",
+    "matplotlib>=3.7",
+    "seaborn>=0.12",
+]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=4.1",
+    "black>=23.9",
+    "flake8>=6.1",
+    "mypy>=1.5",
+]
+
+[project.scripts]
+risksynth-ingest = "risksynth.ingest.ine:main"
+risksynth-generate = "risksynth.generators.generate_synthetic:main"
+risksynth-profiles = "risksynth.engine.stage2:main"
+
+[project.urls]
+Repository = "https://github.com/aditya-forge/RiskSynth-AI"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["risksynth*"]
+
+[tool.black]
+line-length = 110
+target-version = ["py310"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+python_files = ["test_*.py"]
+addopts = "-ra"
+markers = ["slow: end-to-end runs (generator CLI subprocess, Streamlit AppTest); deselect with -m 'not slow'"]
+filterwarnings = [
+    # third-party pytest plugin (anyio) imports a renamed pytest internal
+    "ignore::pytest.PytestRemovedIn10Warning",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
