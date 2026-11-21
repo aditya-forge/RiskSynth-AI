@@ -1,0 +1,27 @@
+# RiskSynth AI - pinned lower bounds (canonical list: pyproject.toml)
+# Install everything for local work:   pip install -r requirements.txt
+# Or as a package:                      pip install -e ".[app,dev]"
+
+# Core pipeline
+pandas>=2.2
+numpy>=1.26
+scipy>=1.11
+pyarrow>=14
+pyyaml>=6.0
+
+# Streamlit UI
+streamlit>=1.46
+altair>=5.4
+
+# Tests
+pytest>=8
+pytest-cov>=4.1
+
+# Optional - generative stage-1 models (CTGAN / copula / TVAE). The Sampler and
+# rule-based engines do not need it; check SDV's supported Python versions first.
+# sdv>=1.9
+
+# Optional - legacy evaluation module (src/risksynth/evaluation/statistical_tests.py)
+# loguru>=0.7
+# matplotlib>=3.7
+# seaborn>=0.12
