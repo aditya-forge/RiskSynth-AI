@@ -105,7 +105,7 @@ def empty_state(key: str) -> None:
     with st.container(border=True):
         st.markdown('<div class="rs"><div class="rs-h2">No dataset yet</div><div class="rs-sub">'
                     'This deployment starts empty. Create a 2,000-client demo dataset with the bootstrap sampler '
-                    '(about 5 seconds), or configure a run in the Live Generator.</div></div>', unsafe_allow_html=True)
+                    '(about 5 seconds), or configure a run in the Generator.</div></div>', unsafe_allow_html=True)
         a, b, _ = st.columns([1.3, 1.3, 3])
         if a.button("Create demo dataset", type="primary", key=f"demo_{key}"):
             cfg = wealth_profile.load_config()
@@ -114,7 +114,7 @@ def empty_state(key: str) -> None:
                            {t: 100 * target[t] for t in TIER_ORDER}, cfg)
         if "generator" in PAGES:
             with b:
-                st.page_link(PAGES["generator"], label="Open the Live Generator")
+                st.page_link(PAGES["generator"], label="Open the Generator")
 
 
 def run_generation(method: str, sdv_model: str, n: int, edge_share: float, seed: int, mix: dict, cfg: dict) -> None:

@@ -3,7 +3,7 @@ RiskSynth AI product portal (Streamlit).
 
 Pages (app/views/):
   overview       product overview, live population KPIs and distributions
-  architecture   pipeline, output schema, rules and edge-case catalogue
+  architecture   pipeline, output schema, rules and edge-case catalogue (linked from the overview)
   generator      live profile generation and exports
   simulator      robo-advisory allocation stress tests
   compliance     statistical fidelity, rule audit and HTML report
@@ -28,9 +28,9 @@ st.set_page_config(page_title="RiskSynth AI", page_icon=str(APP_DIR / "assets" /
 inject_css()
 
 PAGES.update({
-    "overview": st.Page("views/overview.py", title="Product Overview", url_path="overview", default=True),
-    "architecture": st.Page("views/architecture.py", title="Solution Architecture", url_path="architecture"),
-    "generator": st.Page("views/generator.py", title="Live Generator", url_path="generator"),
+    "overview": st.Page("views/overview.py", title="Overview", url_path="overview", default=True),
+    "architecture": st.Page("views/architecture.py", title="Architecture", url_path="architecture"),
+    "generator": st.Page("views/generator.py", title="Generator", url_path="generator"),
     "simulator": st.Page("views/simulator.py", title="Advisory Simulator", url_path="simulator"),
     "compliance": st.Page("views/compliance.py", title="Compliance & Fidelity", url_path="compliance"),
 })

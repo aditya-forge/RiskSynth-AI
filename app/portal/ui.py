@@ -36,8 +36,8 @@ def brand_html() -> str:
     return f'<div class="rs rs-brand">{logo_svg(28)}<span class="word">RiskSynth <b>AI</b></span></div>'
 
 
-NAV_LABELS = {"overview": "Product Overview", "architecture": "Solution Architecture",
-              "generator": "Live Generator", "simulator": "Advisory Simulator",
+# The four working sections. Architecture is a reference page, linked from the overview hero.
+NAV_LABELS = {"overview": "Overview", "generator": "Generator", "simulator": "Advisory Simulator",
               "compliance": "Compliance & Fidelity"}
 
 
