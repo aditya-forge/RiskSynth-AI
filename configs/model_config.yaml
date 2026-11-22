@@ -574,7 +574,7 @@ model_versioning:
     retention_days: 180
 
 # ---------------------------------------------------------------------------
-# Robo-advisory simulator (app/streamlit_app.py tab 3; src/risksynth/scoring/robo_advisor.py)
+# Robo-advisory simulator (Advisory Simulator page; src/risksynth/scoring/robo_advisor.py)
 # A transparent model-portfolio engine to test how profiles drive recommendations.
 # [ASSUMPTION] illustrative parameters, not an investment policy.
 # ---------------------------------------------------------------------------
