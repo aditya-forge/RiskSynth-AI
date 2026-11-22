@@ -6,6 +6,7 @@ import streamlit as st
 
 from portal import PAGES
 from portal.data import active_dataset, baseline_records
+from portal.icons import icon
 from portal.theme import TIER_ORDER, palette
 from portal.ui import EC_SHORT, eur, kpi_grid, pct, section, show
 from risksynth.engine import wealth_profile
@@ -23,9 +24,10 @@ with hero:
         '<div class="rs rs-hero">'
         '<div class="eyebrow">RiskSynth AI &middot; Synthetic data for wealth management</div>'
         '<h1>Synthetic client risk profiles for robo-advisory and wealth management</h1>'
-        '<p class="lead">Privacy-safe client data grounded in INE statistical microdata (ECV, EPF, EPA). '
-        'Test portfolio-allocation models and stress-test MiFID II loss-bearing capacity across '
-        'edge-case cohorts EC01 to EC09.</p></div>', unsafe_allow_html=True)
+        '<p class="lead">Synthetic client profiles built from Spanish household survey microdata (INE ECV, EPF and '
+        'EPA). Use them to test portfolio allocation models and to check how MiFID II risk-capacity rules handle '
+        'difficult clients, from over-leveraged investors to contradictory questionnaires.</p></div>',
+        unsafe_allow_html=True, anchors=False)
     with st.container(key="hero_ctas", horizontal=True, gap=None):
         with st.container(key="hero_primary", width="content"):
             st.page_link(PAGES["generator"], label="Launch Workbench")
@@ -37,11 +39,10 @@ with spec:
             ("Rules enforced", f"CR01-CR0{n_rules} and 3 MiFID II checks"),
             ("Stress cohort", "9 archetypes, 8% of rows by default"),
             ("Engines", "Rule-based, bootstrap sampler, SDV (optional)"),
-            ("Outputs", "Parquet, CSV, JSON metadata, HTML report"),
-            ("License", "MIT")]
+            ("Outputs", "Parquet, CSV, JSON metadata, HTML report")]
     st.markdown('<div class="rs rs-spec-card"><div class="title">Specification</div><table class="rs-spec">'
                 + "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in rows) + "</table></div>",
-                unsafe_allow_html=True)
+                unsafe_allow_html=True, anchors=False)
 
 # Stats bar: every figure is computed or read from config, not typed in
 st.markdown(
@@ -53,18 +54,20 @@ st.markdown(
     '</div>', unsafe_allow_html=True)
 
 # Pillars
-st.markdown(
-    '<div class="rs rs-grid rs-pillars" style="margin-top:28px">'
-    '<div class="rs-pillar"><div class="k rs-mono">01</div><div class="t">Microdata grounded</div>'
-    '<div class="d">Household income, spending, mortgage debt and employment come from INE survey microdata, '
-    'harmonised across ECV, EPF and EPA and weighted to the Spanish population.</div></div>'
-    '<div class="rs-pillar"><div class="k rs-mono">02</div><div class="t">MiFID II suitability</div>'
-    '<div class="d">Two separate engines: stated risk tolerance from the questionnaire, and objective '
-    'loss-bearing capacity from surplus, debt, horizon and liquidity. Effective risk is the lower of the two.</div></div>'
-    '<div class="rs-pillar"><div class="k rs-mono">03</div><div class="t">Edge-case stress testing</div>'
-    '<div class="d">A controlled 8% cohort of nine archetypes, each with an explicit assertion about the '
-    'expected advisor behaviour, plus an allocation simulator that shows the de-risking step by step.</div></div>'
-    '</div>', unsafe_allow_html=True)
+PILLARS = [
+    ("database", "Built on real survey data",
+     "Income, spending, mortgage payments and employment come from INE microdata, cleaned up and weighted to the "
+     "Spanish population. Nothing is invented from scratch."),
+    ("shield", "Tolerance and capacity kept apart",
+     "What a client says they can stomach and what they can actually afford are scored separately. The recommended "
+     "risk is the lower of the two, which is what MiFID II expects."),
+    ("alert", "Hard cases on purpose",
+     "Every dataset includes nine kinds of difficult client, each with a written expectation of what a good advisor "
+     "should do. The simulator shows the de-risking step by step."),
+]
+st.markdown('<div class="rs rs-grid rs-pillars">' + "".join(
+    f'<div class="rs-pillar"><div class="icon">{icon(ic, 20)}</div><div class="t">{t}</div><div class="d">{d}</div></div>'
+    for ic, t, d in PILLARS) + "</div>", unsafe_allow_html=True)
 
 # --------------------------------------------------------------------------- #
 # Live population
@@ -82,11 +85,11 @@ if loaded:
         ("Clients", f"{len(df):,}", "in the active dataset"),
         ("Edge-case cohort", pct(share, 2) if has_ec else "n/a",
          f"{share - target_ec:+.2f} pp vs {target_ec:.0f}% target" if has_ec else "no stage-3 columns"),
-        ("Median investable surplus", eur(df["investable_surplus_eur"].median()), "per year"),
-        ("Negative raw surplus", pct(100 * (df["raw_surplus_eur"] < 0).mean()), "spending and debt above income"),
+        ("Median surplus", eur(df["investable_surplus_eur"].median()), "investable, per year"),
+        ("Spending > income", pct(100 * (df["raw_surplus_eur"] < 0).mean()), "of households, incl. debt"),
         ("Capacity-bound", pct(100 * (df["effective_risk_score"] < df["risk_tolerance_score"]).mean()),
          "effective risk below stated"),
-        ("Re-profiling flags", f"{int(df.get('profile_inconsistency_flag', pd.Series(False)).astype(bool).sum()):,}",
+        ("Re-profile flags", f"{int(df.get('profile_inconsistency_flag', pd.Series(False)).astype(bool).sum()):,}",
          "contradictory answers"),
     ])
     st.write("")

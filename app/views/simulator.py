@@ -5,6 +5,7 @@ import pandas as pd
 import streamlit as st
 
 from portal.data import active_dataset, advisory
+from portal.icons import icon
 from portal.theme import palette
 from portal.ui import EC_SHORT, eur, kpi_grid, pct, section, show
 from risksynth.scoring import robo_advisor
@@ -87,9 +88,10 @@ if loaded:
         raised = [lbl for col, lbl in robo_advisor.ACTION_LABELS.items() if bool(r[col])]
         if bool(r["drawdown_guard_applied"]):
             raised.append("Equity cut to keep the stressed loss within the accepted drawdown")
-        st.markdown("".join(f'<div class="rs rs-action">{t}</div>' for t in raised) if raised else
-                    '<div class="rs rs-action ok">No suitability actions: the tolerance-based allocation stands</div>',
-                    unsafe_allow_html=True)
+        st.markdown('<div class="rs">' + ("".join(f'<div class="rs-action">{icon("flag", 14)}<span>{t}</span></div>'
+                                                  for t in raised) if raised else
+                    f'<div class="rs-action ok">{icon("check", 14)}<span>No suitability actions: the '
+                    'tolerance-based allocation stands</span></div>') + '</div>', unsafe_allow_html=True)
 
     with right:
         with st.container(border=True):

@@ -4,6 +4,7 @@ import html
 import pandas as pd
 import streamlit as st
 
+from portal.icons import icon
 from portal.ui import html_table, section
 from risksynth.engine import wealth_profile
 
@@ -31,8 +32,10 @@ STEPS = [
     ("07", "Outputs", "Advisory simulator, fidelity and compliance report, Parquet, CSV and JSON exports.",
      "scoring, evaluation"),
 ]
-cells = "".join(f'<div class="rs-step"><div class="n">{n}</div><div class="t">{t}</div><div class="d">{d}</div>'
-                f'<div class="m">{m}</div></div>' for n, t, d, m in STEPS)
+STEP_ICONS = ["database", "filter", "layers", "user", "shield", "alert", "file"]
+cells = "".join(f'<div class="rs-step"><div class="top">{icon(ic, 18)}<span class="n">{n}</span></div>'
+                f'<div class="t">{t}</div><div class="d">{d}</div><div class="m">{m}</div></div>'
+                for ic, (n, t, d, m) in zip(STEP_ICONS, STEPS))
 st.markdown(f'<div class="rs rs-grid rs-flow">{cells}</div>', unsafe_allow_html=True)
 st.markdown('<div class="rs rs-note" style="margin-top:8px">Stages 04 to 06 are shared by every engine '
             '(<code>risksynth.engine.stage2.run_stage2</code>), so all outputs carry the same schema and rules.</div>',
