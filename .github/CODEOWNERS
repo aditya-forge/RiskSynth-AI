@@ -1,0 +1,7 @@
+# Every change needs a review from the owner. Pair this with branch protection on main
+# ("Require review from Code Owners") in the repository settings.
+*                    @aditya-forge
+/LICENSE             @aditya-forge
+/SECURITY.md         @aditya-forge
+/.github/            @aditya-forge
+/configs/            @aditya-forge

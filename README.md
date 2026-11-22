@@ -387,7 +387,7 @@ src/risksynth/
 tests/
 scripts/build_brand_assets.py   regenerates app/assets/logo.svg and favicon.png from the mark in portal/icons.py
 archive/                  configs, app and notebooks from synth-bank-es
-Dockerfile, .github/workflows/ci.yml, .github/dependabot.yml, .github/CODEOWNERS, .streamlit/config.toml
+Dockerfile, .github/workflows/ci.yml, .github/CODEOWNERS, .streamlit/config.toml
 LICENSE, SECURITY.md      proprietary license and vulnerability reporting
 ```
 

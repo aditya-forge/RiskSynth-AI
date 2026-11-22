@@ -12,8 +12,7 @@
   cannot be uploaded to PyPI.
 
 ### Added
-- `SECURITY.md` with private vulnerability reporting, Dependabot for pip, GitHub Actions
-  and Docker, and `CODEOWNERS`.
+- `SECURITY.md` with private vulnerability reporting, and `CODEOWNERS`.
 
 ## 2.0.0 - 2026-11-22
 
