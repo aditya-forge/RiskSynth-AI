@@ -52,6 +52,18 @@ def test_generator_form_validates_risk_mix(require_processed):
 
 
 @pytest.mark.slow
+def test_generator_presets_fill_the_form(require_processed):
+    at = _app()
+    at.switch_page("views/generator.py")
+    at.run()
+    [b for b in at.button if b.label == "Use this scenario"][0].click()  # first unselected preset: edge-case stress
+    at.run()
+    assert not at.exception
+    assert at.session_state["gen_edge"] == 15.0
+    assert [w for w in at.slider if w.label == "Edge-case share"][0].value == 15.0
+
+
+@pytest.mark.slow
 def test_generated_dataset_feeds_simulator_and_compliance(require_processed):
     at = _app()
     at.switch_page("views/generator.py")
@@ -65,11 +77,13 @@ def test_generated_dataset_feeds_simulator_and_compliance(require_processed):
         assert [b.label for b in at.get("download_button")] == ["Download CSV", "Download Parquet", "Download JSON metadata"]
         at.switch_page("views/simulator.py")
         at.run()
-        for label in ["EC05 over-leveraged", "EC08 inconsistent"]:
+        html = " ".join(m.value for m in at.markdown)
+        assert "rs-cohorts" in html and "Edge cases EC01-EC09" in html, "cohort scorecard"
+        for label in ["Edge cases EC01-EC09", "Capacity-constrained", "Baseline profiles"]:
             [b for b in at.button if b.label == label][0].click()
             at.run()
             assert not at.exception
-            assert at.session_state["sim_group"].startswith(label[:4])
+            assert at.session_state["sim_group"] == label
         at.switch_page("views/compliance.py")
         at.run()
         assert not at.exception

@@ -179,6 +179,17 @@ table.rs-spec td:first-child {{ color:var(--rs-ink2); width:40%; padding-right:1
 .rs-kpi .n {{ font-size:12px; color:var(--rs-ink2); margin-top:2px; min-height:16px; }}
 .rs-pillars {{ grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); margin-top:28px; }}
 .rs-pillar {{ padding:22px 22px 24px 22px; }}
+/* Scenario presets (generator) and cohort scorecard (simulator) */
+.rs-preset .t {{ display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; color:var(--rs-heading); }}
+.rs-preset .t .ic {{ color:var(--rs-eyebrow); }}
+.rs-preset .d {{ font-size:13px; line-height:1.5; color:var(--rs-ink2); margin:6px 0 4px 0; min-height:39px; }}
+.rs-preset.on .t {{ color:var(--rs-eyebrow); }}
+.rs-scroll {{ overflow-x:auto; }}
+.rs-cohorts td.num, .rs-cohorts th.num {{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }}
+.rs-cohorts th.num {{ white-space:normal; min-width:92px; }}
+.rs-cohorts .name {{ white-space:nowrap; color:var(--rs-heading); }}
+.rs-cohorts td .bad {{ color:var(--rs-bad); }}
+.rs-cohorts td .good {{ color:var(--rs-good); }}
 .rs-pillar .icon {{ width:36px; height:36px; border:1px solid var(--rs-rule); border-radius:2px; display:flex;
                     align-items:center; justify-content:center; color:var(--rs-accent); }}
 .rs-pillar .t {{ font-size:16px; font-weight:600; color:var(--rs-heading); margin:14px 0 8px 0; }}

@@ -112,13 +112,13 @@ streamlit run app/streamlit_app.py      # then open http://localhost:8501
 
 | Page | Contents |
 |---|---|
-| Product Overview | Population figures, risk-tier mix against target, surplus distribution, edge-case cohort, capacity vs stated tolerance |
-| Solution Architecture | Pipeline, output schema, consistency rules, risk-capacity caps, edge-case catalogue and calibration status |
-| Live Generator | Runs the rule-based, bootstrap or SDV engine with a chosen size, risk mix, edge-case share and seed; CSV, Parquet and JSON downloads |
-| Advisory Simulator | Model portfolio per client under three rules (stated tolerance only, plus capacity and liquidity, plus a drawdown limit) and the resulting advisor actions |
+| Overview | Population figures, risk-tier mix against target, surplus distribution, edge-case cohort, capacity vs stated tolerance |
+| Architecture (linked from the overview) | Pipeline, output schema, consistency rules, risk-capacity caps, edge-case catalogue and calibration status |
+| Generator | Scenario presets (baseline, edge-case stress, capacity-constrained), then runs the rule-based, bootstrap or SDV engine with a chosen size, risk mix, edge-case share and seed; CSV, Parquet and JSON downloads |
+| Advisory Simulator | Cohort scorecard (baseline, EC01-EC09 edge cases, capacity-bound, re-profiling) with suitability flags and stressed losses, then the model portfolio per client under three rules (stated tolerance only, plus capacity and liquidity, plus a drawdown limit) and the resulting advisor actions |
 | Compliance & Fidelity | KS, Wasserstein and Jensen-Shannon tests against INE, correlation heatmaps, rule checks, downloadable HTML report |
 
-The portal uses Streamlit's multipage navigation with a shared header, theme and dataset selector. On an empty deployment, the overview and analysis pages offer a one-click 2,000-client bootstrap demo; use the Live Generator for a configured run.
+The portal uses Streamlit's multipage navigation with a shared header, theme and dataset selector. On an empty deployment, the overview and analysis pages offer a one-click 2,000-client bootstrap demo; use the Generator for a configured run.
 
 ### Reading CSV outputs
 

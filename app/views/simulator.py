@@ -23,31 +23,77 @@ if loaded:
     df, path, mtime = loaded
     rec = advisory(path, mtime)
     has_ec = "edge_case_id" in df
-    groups = ["All clients"]
-    if has_ec:
-        groups += ["Base population"] + [f"{e}  {EC_SHORT[e]}" for e in sorted(df["edge_case_id"].dropna().unique())]
+    edge = df["edge_case_id"].notna() if has_ec else pd.Series(False, index=df.index)
+    limit = df["max_acceptable_drawdown_pct"].astype(float)
+    caps = df.get("capacity_caps_applied", pd.Series(pd.NA, index=df.index)).astype("string").fillna("")
 
-    def _pick(prefix: str) -> None:
-        match = next((g for g in groups if g.startswith(prefix)), None)
-        if match:
-            st.session_state["sim_group"] = match
-            st.session_state.pop("sim_client", None)
+    # Test cohorts: the slices a robo-advisor has to get right, side by side
+    COHORTS = {
+        "Baseline profiles": ~edge,
+        "Edge cases EC01-EC09": edge,
+        "Capacity-constrained": rec["action_capacity_bound"].fillna(False).astype(bool),
+        "Re-profiling": rec["action_reprofile"].fillna(False).astype(bool),
+    }
+    section("Test cohorts",
+            "How each slice of the synthetic book stresses an allocation model: how often MiFID II capacity binds, "
+            "how far a tolerance-only portfolio would fall against what clients accept, and whether the "
+            "recommended portfolio stays inside the limit.")
+    rows = []
+    for name, m in COHORTS.items():
+        n = int(m.sum())
+        if n == 0:
+            rows.append((name, 0) + ("-",) * 8)
+            continue
+        breach = 100 * (rec.loc[m, "rec_stress_loss_pct"] > limit[m] + 0.05).mean()
+        rows.append((name, n,
+                     pct(100 * rec.loc[m, "action_capacity_bound"].fillna(False).astype(bool).mean()),
+                     pct(100 * (caps[m] != "").mean()),
+                     pct(100 * rec.loc[m, "action_reprofile"].fillna(False).astype(bool).mean()),
+                     pct(limit[m].mean()),
+                     (pct(rec.loc[m, "naive_stress_loss_pct"].mean()), "bad"),
+                     pct(rec.loc[m, "rec_stress_loss_pct"].mean()),
+                     (pct(breach), "good" if breach == 0 else "bad"),
+                     f"{rec.loc[m, 'equity_reduction_pp'].mean():.1f} pp"))
+    heads = ["Cohort", "Clients", "Capacity-bound", "Capacity caps", "Re-profile", "Accepted drawdown",
+             "Stressed loss, tolerance only", "Stressed loss, recommended", "Over limit after advice", "Equity cut"]
+
+    def _td(v, i):
+        text, cls = v if isinstance(v, tuple) else (v, "")
+        text = f"{text:,}" if isinstance(text, int) else text
+        inner = f'<span class="{cls}">{text}</span>' if cls else text
+        return f'<td class="{"num" if i else "name"}">{inner}</td>'
+    st.markdown('<div class="rs rs-scroll"><table class="rs-table rs-cohorts"><thead><tr>'
+                + "".join(f'<th class="{"num" if i else "name"}">{h}</th>' for i, h in enumerate(heads))
+                + "</tr></thead><tbody>"
+                + "".join("<tr>" + "".join(_td(v, i) for i, v in enumerate(r)) + "</tr>" for r in rows)
+                + "</tbody></table></div>", unsafe_allow_html=True)
+    st.caption("Capacity-bound: effective risk below stated tolerance. Capacity caps: at least one MiFID II capacity "
+               "cap (CAP_*) applied. Accepted drawdown and stressed losses are cohort means; stress scenario equities "
+               "-50%, fixed income -10%, cash 0%. No real client data is involved at any step.")
+
+    section("Client drill-down", "Pick a cohort, then step through individual clients.")
+    groups = ["All clients"] + [c for c, m in COHORTS.items() if m.any()]
+    if has_ec:
+        groups += [f"{e}  {EC_SHORT[e]}" for e in sorted(df["edge_case_id"].dropna().unique())]
+
+    def _pick(name: str) -> None:
+        st.session_state["sim_group"] = name
+        st.session_state.pop("sim_client", None)
 
     if st.session_state.get("sim_group") not in groups:
         st.session_state["sim_group"] = groups[0]
-    a, b, c, d, e = st.columns([1.5, 1.8, 0.9, 1.05, 1.05], vertical_alignment="bottom")
-    group = a.selectbox("Stress profile", groups, key="sim_group")
-    c.button("Random client", width="stretch",
-             on_click=lambda: st.session_state.update(sim_client="random"))
-    d.button("EC05 over-leveraged", width="stretch", disabled="EC05" not in "".join(groups),
-             on_click=_pick, args=("EC05",))
-    e.button("EC08 inconsistent", width="stretch", disabled="EC08" not in "".join(groups),
-             on_click=_pick, args=("EC08",))
+    with st.container(horizontal=True, key="sim_presets", gap="small"):
+        for name, m in COHORTS.items():
+            st.button(name, disabled=not m.any(), on_click=_pick, args=(name,),
+                      type="primary" if st.session_state["sim_group"] == name else "secondary", key=f"cohort_{name}")
+        st.button("Random client", key="sim_random", on_click=lambda: st.session_state.update(sim_client="random"))
+    a, b = st.columns([1.5, 2.8], vertical_alignment="bottom")
+    group = a.selectbox("Cohort or archetype", groups, key="sim_group")
 
     if group == "All clients":
         pool = df.index
-    elif group == "Base population":
-        pool = df.index[df["edge_case_id"].isna()]
+    elif group in COHORTS:
+        pool = df.index[COHORTS[group]]
     else:
         pool = df.index[df["edge_case_id"].eq(group.split()[0]).fillna(False)]
     options = list(pool[:400])
