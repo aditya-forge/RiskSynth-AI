@@ -8,7 +8,7 @@ import pandas as pd
 import streamlit as st
 
 from portal import GITHUB_URL
-from portal.icons import icon
+from portal.icons import icon, logo
 from portal.theme import mode, palette
 
 EC_SHORT = {"EC01": "High income, low liquidity", "EC02": "Young, high risk, low capital",
@@ -18,22 +18,8 @@ EC_SHORT = {"EC01": "High income, low liquidity", "EC02": "Young, high risk, low
             "EC09": "Asset-rich, cash-poor"}
 
 
-def logo_svg(size: int = 28) -> str:
-    """Emblem: chart axes with an efficient-frontier curve through three portfolio nodes."""
-    p = palette()
-    return (f'<svg width="{size}" height="{size}" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" '
-            f'role="img" aria-label="RiskSynth AI">'
-            f'<rect x="0.75" y="0.75" width="26.5" height="26.5" stroke="{p["rule"]}" stroke-width="1.5"/>'
-            f'<path d="M6 5.5V22H22.5" stroke="{p["ink"]}" stroke-width="1.6" stroke-linecap="square"/>'
-            f'<path d="M7.5 20C10 13 14 9.5 21.5 7.5" stroke="{p["accent"]}" stroke-width="1.6"/>'
-            f'<rect x="8.6" y="15.1" width="3" height="3" fill="{p["accent"]}"/>'
-            f'<rect x="13.1" y="9.9" width="3" height="3" fill="{p["ink"]}"/>'
-            f'<rect x="18.6" y="6.7" width="3" height="3" fill="{p["accent"]}"/>'
-            f'</svg>')
-
-
 def brand_html() -> str:
-    return f'<div class="rs rs-brand">{logo_svg(28)}<span class="word">RiskSynth <b>AI</b></span></div>'
+    return f'<div class="rs rs-brand">{logo(28)}<span class="word">RiskSynth <b>AI</b></span></div>'
 
 
 # The four working sections. Architecture is a reference page, linked from the overview hero.

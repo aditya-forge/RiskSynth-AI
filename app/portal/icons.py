@@ -35,6 +35,40 @@ _GITHUB = ('<path fill="currentColor" stroke="none" d="M12 2.2a9.9 9.9 0 0 0-3.1
            ' 2.7 0 3.8-2.3 4.6-4.5 4.9.4.3.7.9.7 1.9v2.8c0 .3.2.6.7.5A9.9 9.9 0 0 0 12 2.2z"/>')
 
 
+# --------------------------------------------------------------------------- #
+# Brand mark: the graph of effective risk = min(tolerance, capacity). The line climbs with
+# stated tolerance, then runs flat once it reaches the capacity cap; the faded continuation
+# is the risk the client wanted but cannot bear. Drawn on a 32x32 grid as straight strokes,
+# so the SVG and the PNG favicon (scripts/build_brand_assets.py) come from the same numbers.
+# --------------------------------------------------------------------------- #
+LOGO_BLUE = "#1e88e5"
+LOGO_GRID = 32
+LOGO_TILE_RADIUS = 3
+# (points, stroke width, opacity): the faded tolerance line the client asked for, then the
+# effective-risk line on top of it.
+LOGO_STROKES = [
+    (((17.0, 14.0), (26.5, 4.5)), 3.4, 0.5),
+    (((5.5, 25.5), (17.0, 14.0), (27.0, 14.0)), 3.4, 1.0),
+]
+LOGO_NODE: tuple[float, float, float] | None = None   # optional square marker (centre x, centre y, side)
+
+
+def logo(size: int = 28, label: str = "RiskSynth AI") -> str:
+    """The brand mark as inline SVG. Same in both themes: a blue tile reads on dark and white."""
+    g = LOGO_GRID
+    paths = "".join(
+        f'<path d="M{" L".join(f"{x:g} {y:g}" for x, y in pts)}" fill="none" stroke="#ffffff" '
+        f'stroke-width="{w:g}" stroke-linejoin="round"' + (f' stroke-opacity="{o:g}"' if o < 1 else "") + "/>"
+        for pts, w, o in LOGO_STROKES)
+    cx, cy, side = LOGO_NODE or (0, 0, 0)
+    if side > 0:
+        paths += (f'<rect x="{cx - side / 2:g}" y="{cy - side / 2:g}" width="{side:g}" height="{side:g}" '
+              f'fill="#ffffff"/>')
+    return (f'<svg width="{size}" height="{size}" viewBox="0 0 {g} {g}" xmlns="http://www.w3.org/2000/svg" '
+            f'role="img" aria-label="{label}"><rect width="{g}" height="{g}" rx="{LOGO_TILE_RADIUS}" '
+            f'fill="{LOGO_BLUE}"/>{paths}</svg>')
+
+
 def icon(name: str, size: int = 16, label: str | None = None) -> str:
     body = _GITHUB if name == "github" else _PATHS[name]
     aria = f'role="img" aria-label="{label}"' if label else 'aria-hidden="true"'
