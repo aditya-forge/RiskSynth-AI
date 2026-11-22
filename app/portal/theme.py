@@ -185,6 +185,30 @@ table.rs-spec td:first-child {{ color:var(--rs-ink2); width:40%; padding-right:1
 .rs-preset .d {{ font-size:13px; line-height:1.5; color:var(--rs-ink2); margin:6px 0 4px 0; min-height:39px; }}
 .rs-preset.on .t {{ color:var(--rs-eyebrow); }}
 .rs-scroll {{ overflow-x:auto; }}
+.rs-pass {{ color:var(--rs-good); font-weight:600; }}
+.rs-fail {{ color:var(--rs-bad); font-weight:600; }}
+.rs-muted {{ color:var(--rs-ink3); }}
+.rs-scorecard td code {{ white-space:normal; font-size:11.5px; }}
+.rs-scorecard td .sub {{ margin-top:3px; font-size:11.5px; color:var(--rs-ink3); white-space:normal; }}
+.rs-scorecard td.name .sub {{ max-width:420px; }}
+.rs-scorecard td.num .sub {{ white-space:nowrap; }}
+.rs-checks td {{ padding:7px 10px; }}
+.rs-checks td.id {{ font-family:'IBM Plex Mono', monospace; font-size:12px; white-space:nowrap; color:var(--rs-heading); }}
+.rs-verdict > div:first-child .v {{ font-family:inherit !important; font-weight:600; font-size:17px; }}
+.rs-checks td.st {{ text-align:right; white-space:nowrap; font-size:12.5px; }}
+.rs-verdict {{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); border:1px solid var(--rs-line);
+               border-left-width:3px; background:var(--rs-panel); margin-bottom:16px; border-radius:2px; }}
+.rs-verdict > div {{ padding:12px 14px; border-left:1px solid var(--rs-line); min-width:0; }}
+.rs-verdict > div:first-child {{ border-left:none; }}
+.rs-verdict .k {{ font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--rs-ink2); }}
+.rs-verdict .v {{ font-family:'JetBrains Mono', ui-monospace, monospace !important; font-size:18px; font-weight:500;
+                  color:var(--rs-heading); margin-top:4px; }}
+.rs-verdict .n {{ font-size:12px; color:var(--rs-ink2); margin-top:2px; }}
+.rs-verdict.good {{ border-left-color:var(--rs-good); }} .rs-verdict.good > div:first-child .v {{ color:var(--rs-good); }}
+.rs-verdict.warn {{ border-left-color:var(--rs-accent); }} .rs-verdict.warn > div:first-child .v {{ color:var(--rs-eyebrow); }}
+.rs-verdict.bad {{ border-left-color:var(--rs-bad); }} .rs-verdict.bad > div:first-child .v {{ color:var(--rs-bad); }}
+@media (max-width: 900px) {{ .rs-verdict {{ grid-template-columns:repeat(2, minmax(0, 1fr)); }}
+  .rs-verdict > div:nth-child(3) {{ border-left:none; }} .rs-verdict > div:nth-child(n+3) {{ border-top:1px solid var(--rs-line); }} }}
 .rs-cohorts td.num, .rs-cohorts th.num {{ text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }}
 .rs-cohorts th.num {{ white-space:normal; min-width:92px; }}
 .rs-cohorts .name {{ white-space:nowrap; color:var(--rs-heading); }}

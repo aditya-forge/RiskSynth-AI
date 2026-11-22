@@ -5,9 +5,9 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from portal.data import active_dataset, fidelity_results, rel
+from portal.data import active_dataset, edge_scorecard, fidelity_results, rel
 from portal.theme import palette
-from portal.ui import SHORT, heatmap, kpi_grid, section, show
+from portal.ui import SHORT, heatmap, kpi_grid, scorecard_html, section, show
 from risksynth.evaluation import fidelity
 
 p = palette()
@@ -95,6 +95,11 @@ if loaded:
 
     section("Rule and suitability audit", "Violations after repair. Exempted rows are intentional edge-case traits.")
     status_table(comp, definition=st.column_config.TextColumn("Rule", width="large"))
+
+    section("Edge-case suitability scorecard",
+            "Pass/fail per EC01-EC09 archetype: the written assertion, the expected capacity cap, and the stressed "
+            "loss of the recommended portfolio against the client's accepted drawdown.")
+    st.markdown(scorecard_html(edge_scorecard(path, mtime)), unsafe_allow_html=True)
 
     section("Evaluation report", "A self-contained HTML report with every table on this page.")
     if st.button("Build HTML report"):

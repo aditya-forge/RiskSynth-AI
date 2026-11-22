@@ -4,6 +4,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 pytest.importorskip("streamlit")
@@ -74,7 +75,12 @@ def test_generated_dataset_feeds_simulator_and_compliance(require_processed):
     run_dir = Path(at.session_state["last_run"])
     try:
         assert not at.exception and (run_dir / "profiles.parquet").exists()
-        assert [b.label for b in at.get("download_button")] == ["Download CSV", "Download Parquet", "Download JSON metadata"]
+        assert [b.label for b in at.get("download_button")] == ["Download CSV", "Download Parquet",
+                                                                "Download JSON metadata", "Download run contract"]
+        from risksynth import contract
+        c = contract.load(run_dir / "run_contract.json")
+        assert c["parameters"]["rows"] == 1000 and c["assumptions"]
+        assert contract.verify(c, pd.read_parquet(run_dir / "profiles.parquet")) == []
         at.switch_page("views/simulator.py")
         at.run()
         html = " ".join(m.value for m in at.markdown)
@@ -84,6 +90,13 @@ def test_generated_dataset_feeds_simulator_and_compliance(require_processed):
             at.run()
             assert not at.exception
             assert at.session_state["sim_group"] == label
+        # counterfactual: push the stated tolerance to 10 and the accepted drawdown to 1%
+        [w for w in at.slider if w.label.startswith("Stated risk tolerance")][0].set_value(10)
+        [w for w in at.slider if w.label.startswith("Accepted drawdown")][0].set_value(1)
+        at.run()
+        assert not at.exception
+        html = " ".join(m.value for m in at.markdown)
+        assert "rs-verdict" in html and "2 inputs changed" in html and "rs-scorecard" in html
         at.switch_page("views/compliance.py")
         at.run()
         assert not at.exception

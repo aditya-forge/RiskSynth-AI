@@ -122,6 +122,39 @@ def html_table(frame: pd.DataFrame, code_cols: tuple = ()) -> str:
     return f'<table class="rs rs-table"><thead><tr>{head}</tr></thead><tbody>{"".join(rows)}</tbody></table>'
 
 
+def scorecard_html(frame: pd.DataFrame) -> str:
+    """EC01-EC09 suitability scorecard (risksynth.scoring.scorecard) as a compact table."""
+    if frame is None or frame.empty:
+        return '<div class="rs rs-note">This dataset has no edge-case cohort.</div>'
+
+    def p(v):
+        return "-" if v is None or pd.isna(v) else f"{v:.1f}%"
+    heads = ["ID", "Archetype and assertion", "Clients", "Assertion holds", "Capacity cap fired", "Accepted drawdown",
+             "Loss, tolerance only", "Loss, recommended", "Over limit after advice", "Status"]
+    body = []
+    for _, r in frame.iterrows():
+        status = {"PASS": "rs-pass", "FAIL": "rs-fail"}.get(r["status"], "rs-muted")
+        has_cap = isinstance(r["capacity_cap"], str) and r["capacity_cap"]
+        cap = (f'{p(r["cap_fired_pct"])}<div class="sub">{html.escape(r["capacity_cap"])}</div>' if has_cap
+               else '<span class="rs-muted">no cap</span>')
+        cells = [f'<td class="name">{r["id"]}</td>',
+                 f'<td class="name">{html.escape(str(r["archetype"]))}'
+                 f'<div class="sub"><code>{html.escape(str(r["assertion"]))}</code></div></td>',
+                 f'<td class="num">{int(r["clients"]):,}</td>',
+                 f'<td class="num">{p(r["assertion_pass_pct"])}</td>', f'<td class="num">{cap}</td>',
+                 f'<td class="num">{p(r["accepted_drawdown_pct"])}</td>',
+                 f'<td class="num">{p(r["stress_loss_tolerance_only_pct"])}</td>',
+                 f'<td class="num">{p(r["stress_loss_recommended_pct"])}</td>',
+                 f'<td class="num">{p(r["over_limit_after_advice_pct"])}</td>',
+                 f'<td class="num"><span class="{status}">{r["status"]}</span></td>']
+        body.append("<tr>" + "".join(cells) + "</tr>")
+    head = "".join(f'<th class="{"name" if i < 2 else "num"}">{h}</th>' for i, h in enumerate(heads))
+    passed = int((frame["status"] == "PASS").sum())
+    return (f'<div class="rs rs-scroll"><table class="rs-table rs-cohorts rs-scorecard"><thead><tr>{head}</tr></thead>'
+            f'<tbody>{"".join(body)}</tbody></table></div>'
+            f'<div class="rs rs-note" style="margin-top:8px">{passed} of {len(frame)} archetypes pass.</div>')
+
+
 def eur(x: float) -> str:
     return f"EUR {x:,.0f}"
 

@@ -1,14 +1,16 @@
 """Robo-advisory simulator: allocation per client and protection per stress profile."""
+import html
+
 import altair as alt
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-from portal.data import active_dataset, advisory
+from portal.data import active_dataset, advisory, edge_scorecard
 from portal.icons import icon
 from portal.theme import palette
-from portal.ui import EC_SHORT, eur, kpi_grid, pct, section, show
-from risksynth.scoring import robo_advisor
+from portal.ui import EC_SHORT, pct, scorecard_html, section, show
+from risksynth.scoring import counterfactual
 
 p = palette()
 SLEEVES = ["Equities", "Fixed income", "Cash"]
@@ -71,7 +73,9 @@ if loaded:
                "cap (CAP_*) applied. Accepted drawdown and stressed losses are cohort means; stress scenario equities "
                "-50%, fixed income -10%, cash 0%. No real client data is involved at any step.")
 
-    section("Client drill-down", "Pick a cohort, then step through individual clients.")
+    section("Counterfactual client inspector",
+            "Pick a client, including any EC01-EC09 edge case, then change its inputs. Risk capacity, the rule checks, "
+            "the suitability status and the portfolio are recomputed with the same engine code the generator uses.")
     groups = ["All clients"] + [c for c, m in COHORTS.items() if m.any()]
     if has_ec:
         groups += [f"{e}  {EC_SHORT[e]}" for e in sorted(df["edge_case_id"].dropna().unique())]
@@ -103,45 +107,75 @@ if loaded:
     client = b.selectbox("Client", options, index=options.index(current) if current in options else 0,
                          format_func=lambda i: (f"#{i}  age {int(df.at[i, 'edad'])}  {df.at[i, 'risk_tolerance_category']}  "
                                                 f"{df.at[i, 'edge_case_id'] if has_ec and pd.notna(df.at[i, 'edge_case_id']) else ''}"))
-    row, r = df.loc[client], rec.loc[client]
+    row = df.loc[client]
+
+    # Counterfactual inputs: keyed by client, so picking another client starts from its own values
+    goals = sorted(df["primary_investment_goal"].dropna().astype(str).unique())
+    INPUTS = {   # column: (kind, min, max, step)
+        "edad": ("int", 18, 100, 1), "net_income_annual_eur": ("eur", 0, 500_000, 1_000),
+        "household_expenses_annual_eur": ("eur", 0, 500_000, 1_000),
+        "total_debt_service_annual_eur": ("eur", 0, 200_000, 500), "liquid_savings_eur": ("eur", 0, 2_000_000, 1_000),
+        "risk_tolerance_score": ("slider", 1, 10, 1), "investment_horizon_years": ("float", 0.5, 60.0, 0.5),
+        "max_acceptable_drawdown_pct": ("slider", 0, 60, 1), "liquidity_need_pct": ("slider", 0, 100, 1),
+        "primary_investment_goal": ("goal", None, None, None),
+    }
+
+    def _original(col):
+        v = row[col]
+        if col == "primary_investment_goal":
+            return str(v)
+        if INPUTS[col][0] in ("int", "slider"):
+            return int(round(float(v)))
+        return float(round(float(0 if pd.isna(v) else v), 1))
+
+    def _reset() -> None:
+        for col in INPUTS:
+            st.session_state.pop(f"cf_{client}_{col}", None)
 
     left, right = st.columns([1, 1.55], gap="large")
     with left, st.container(border=True):
-        st.markdown('<div class="rs rs-label" style="margin-top:0">Client profile</div>', unsafe_allow_html=True)
-        facts = {
-            "Age / goal": f"{int(row['edad'])} / {row['primary_investment_goal']}",
-            "Horizon": f"{row['investment_horizon_years']:.1f} y ({row['investment_horizon_bucket']})",
-            "Stated tolerance": f"{int(row['risk_tolerance_score'])} ({row['risk_tolerance_category']})",
-            "Risk capacity": f"{int(row['risk_capacity_score'])}",
-            "Effective risk": f"{int(row['effective_risk_score'])}",
-            "Max drawdown accepted": pct(row["max_acceptable_drawdown_pct"], 0),
-            "Liquidity need": pct(row["liquidity_need_pct"], 0),
-            "Investable surplus": eur(row["investable_surplus_eur"]) + " / y",
-            "Liquid savings": eur(row["liquid_savings_eur"]),
-            "Debt service / income": pct(100 * (row["debt_service_to_income"] if pd.notna(row["debt_service_to_income"]) else 0)),
-            "ESG preference": str(row["esg_preference_level"]),
-            "Capacity caps": str(row.get("capacity_caps_applied")) if pd.notna(row.get("capacity_caps_applied")) else "none",
-        }
-        st.markdown('<dl class="rs rs-facts">' + "".join(f"<dt>{k}</dt><dd>{v}</dd>" for k, v in facts.items())
-                    + "</dl>", unsafe_allow_html=True)
-        if has_ec and pd.notna(row.get("edge_case_id")):
-            verdict = "assertion holds" if bool(row.get("edge_case_assertion_pass")) else "assertion fails"
-            st.markdown(f'<div class="rs rs-expect"><b>{row["edge_case_id"]} {EC_SHORT[row["edge_case_id"]]}</b> '
-                        f'({row["edge_case_origin"]})<br>Expected behaviour: {row["expected_robo_behavior"]}<br>'
-                        f'<span class="rs-note">Test <code>{row["edge_case_assertion"]}</code>: {verdict}</span></div>',
-                        unsafe_allow_html=True)
-        st.markdown('<div class="rs rs-label">Advisor actions</div>', unsafe_allow_html=True)
-        raised = [lbl for col, lbl in robo_advisor.ACTION_LABELS.items() if bool(r[col])]
-        if bool(r["drawdown_guard_applied"]):
-            raised.append("Equity cut to keep the stressed loss within the accepted drawdown")
-        st.markdown('<div class="rs">' + ("".join(f'<div class="rs-action">{icon("flag", 14)}<span>{t}</span></div>'
-                                                  for t in raised) if raised else
-                    f'<div class="rs-action ok">{icon("check", 14)}<span>No suitability actions: the '
-                    'tolerance-based allocation stands</span></div>') + '</div>', unsafe_allow_html=True)
+        st.markdown('<div class="rs rs-label" style="margin-top:0">What if: adjust the inputs</div>',
+                    unsafe_allow_html=True)
+        values = {}
+        c1, c2 = st.columns(2)
+        for i, (col, (kind, lo, hi, step)) in enumerate(INPUTS.items()):
+            key, label, orig = f"cf_{client}_{col}", counterfactual.EDITABLE[col], _original(col)
+            box = c1 if i % 2 == 0 else c2
+            if kind == "goal":
+                values[col] = box.selectbox(label, goals, index=goals.index(orig) if orig in goals else 0, key=key)
+            elif kind == "slider":
+                values[col] = box.slider(label, lo, hi, min(max(orig, lo), hi), step, key=key)
+            elif kind == "int":
+                values[col] = box.number_input(label, lo, hi, min(max(orig, lo), hi), step, key=key)
+            else:
+                values[col] = box.number_input(label, float(lo), float(hi), min(max(orig, float(lo)), float(hi)),
+                                               float(step), key=key)
+        changes = {c: v for c, v in values.items() if v != _original(c)}
+        st.button("Reset to the generated profile", on_click=_reset, disabled=not changes, key=f"cf_reset_{client}")
 
+    cf = counterfactual.reassess(row, changes)
+    r, prof = cf["recommendation"], cf["profile"].iloc[0]
     with right:
+        tone = {"Suitable": "good", "Suitable with restrictions": "warn", "Re-profile": "bad"}[cf["status"]]
+        moved = f"{len(changes)} input{'s' if len(changes) != 1 else ''} changed" if changes else "as generated"
+
+        def _delta(before, after):
+            return f"{before} &rarr; {after}" if before != after else str(after)
+        st.markdown(
+            f'<div class="rs rs-verdict {tone}"><div><div class="k">Suitability status</div>'
+            f'<div class="v">{cf["status"]}</div><div class="n">{moved}</div></div>'
+            f'<div><div class="k">Risk capacity</div><div class="v">'
+            f'{_delta(int(row["risk_capacity_score"]), cf["capacity_score"])}</div>'
+            f'<div class="n">{cf["capacity_points"]} points before caps</div></div>'
+            f'<div><div class="k">Effective risk</div><div class="v">'
+            f'{_delta(int(row["effective_risk_score"]), cf["effective_risk"])}</div>'
+            f'<div class="n">stated {int(prof["risk_tolerance_score"])} ({cf["tolerance_category"]})</div></div>'
+            f'<div><div class="k">Stressed loss</div><div class="v">{pct(r["rec_stress_loss_pct"])}</div>'
+            f'<div class="n">limit {prof["max_acceptable_drawdown_pct"]:.0f}%, tolerance only '
+            f'{pct(r["naive_stress_loss_pct"])}</div></div></div>', unsafe_allow_html=True)
         with st.container(border=True):
-            steps = [("1  Tolerance only", "naive"), ("2  + Capacity and liquidity", "capacity"), ("3  + Drawdown limit", "rec")]
+            steps = [("1  Tolerance only", "naive"), ("2  + Capacity and liquidity", "capacity"),
+                     ("3  + Drawdown limit", "rec")]
             rows = [{"step": label, "sleeve": s, "pct": float(v), "order": i}
                     for label, pre in steps
                     for i, (s, v) in enumerate(zip(SLEEVES, [r[f"{pre}_equity_pct"], r[f"{pre}_fixed_income_pct"],
@@ -157,14 +191,40 @@ if loaded:
                 y=alt.Y("step:N", sort=sort), x=alt.X("pct:Q", stack="zero", bandPosition=0.5),
                 detail="sleeve:N", order=alt.Order("order:Q"), text=alt.Text("pct:Q", format=".0f"))
             show((bars + text).properties(title=alt.Title(
-                "Recommended allocation", subtitle="Each row adds one suitability protection")), height=250)
-        kpi_grid([
-            ("Stressed loss", pct(r["rec_stress_loss_pct"]), f"limit {row['max_acceptable_drawdown_pct']:.0f}%"),
-            ("Tolerance-only loss", pct(r["naive_stress_loss_pct"]), "same stress scenario"),
-            ("Equity cut", f"{r['equity_reduction_pp']:.1f} pp",
-             f"capacity {r['equity_cut_by_capacity_pp']:.1f}, limit {r['equity_cut_by_drawdown_pp']:.1f}"),
-            ("ESG-screened", pct(r["rec_esg_pct"]), f"preference {row['esg_preference_level']}"),
-        ])
+                "Recommended allocation", subtitle="Each row adds one suitability protection")), height=260)
+
+    def _state(item):
+        if not item["violated"]:
+            return '<span class="rs-pass">pass</span>'
+        if item.get("exempt"):
+            return '<span class="rs-muted">relaxed for this edge case</span>'
+        return '<span class="rs-fail">violated</span>'
+
+    checks, actions = st.columns([1.15, 1], gap="large")
+    with checks:
+        st.markdown('<div class="rs rs-label" style="margin-top:0">CR01-CR07 and MiFID II checks</div>',
+                    unsafe_allow_html=True)
+        body = "".join(f'<tr><td class="id">{x["rule"].replace("MIFID_", "MiFID ")}</td>'
+                       f'<td><code>{html.escape(x["text"])}</code></td>'
+                       f'<td class="st">{_state(x)}</td></tr>' for x in cf["rules"] + cf["mifid"])
+        st.markdown(f'<table class="rs rs-table rs-checks"><tbody>{body}</tbody></table>', unsafe_allow_html=True)
+    with actions:
+        caps = ", ".join(cf["caps"]) if cf["caps"] else "none"
+        st.markdown(f'<div class="rs rs-label" style="margin-top:0">Capacity caps</div>'
+                    f'<div class="rs rs-note" style="margin-bottom:8px"><code>{caps}</code></div>',
+                    unsafe_allow_html=True)
+        st.markdown('<div class="rs rs-label">Advisor actions</div>', unsafe_allow_html=True)
+        st.markdown('<div class="rs">' + ("".join(f'<div class="rs-action">{icon("flag", 14)}<span>{t}</span></div>'
+                                                  for t in cf["actions"]) if cf["actions"] else
+                    f'<div class="rs-action ok">{icon("check", 14)}<span>No suitability actions: the '
+                    'tolerance-based allocation stands</span></div>') + '</div>', unsafe_allow_html=True)
+        ea = cf["edge_case_assertion"]
+        if ea:
+            verdict = '<span class="rs-pass">holds</span>' if ea["holds"] else '<span class="rs-fail">fails</span>'
+            st.markdown(f'<div class="rs rs-expect" style="margin-top:12px"><b>{ea["id"]} {EC_SHORT[ea["id"]]}</b>'
+                        f'<br>Expected behaviour: {html.escape(ea["expected"])}<br>'
+                        f'<span class="rs-note">Test <code>{html.escape(ea["test"])}</code>: {verdict}</span></div>',
+                        unsafe_allow_html=True)
 
     section("Protection by stress profile",
             "Mean equity share per archetype under each rule. The gap between the dots is the equity the suitability "
@@ -193,15 +253,9 @@ if loaded:
             "Mean equity share per stress profile",
             subtitle="EC08 is driven to bonds and cash by its 5-10% drawdown limit; EC05 by its debt-service cap")),
             height=440)
-    st.dataframe(agg[["group", "clients", "naive", "capacity", "recommended", "capacity_bound", "guard", "no_contrib",
-                      "reprofile"]], hide_index=True, width="stretch", column_config={
-        "group": "Profile", "clients": st.column_config.NumberColumn("Clients", format="%d"),
-        "naive": st.column_config.NumberColumn("Equity, tolerance only %", format="%.1f"),
-        "capacity": st.column_config.NumberColumn("Equity, capacity %", format="%.1f"),
-        "recommended": st.column_config.NumberColumn("Equity, recommended %", format="%.1f"),
-        "capacity_bound": st.column_config.NumberColumn("Capacity-bound", format="percent"),
-        "guard": st.column_config.NumberColumn("Drawdown limit applied", format="percent"),
-        "no_contrib": st.column_config.NumberColumn("No contributions", format="percent"),
-        "reprofile": st.column_config.NumberColumn("Re-profile", format="percent")})
+    section("Edge-case suitability scorecard",
+            "One row per archetype: does the written assertion hold, does the expected capacity cap fire, and does "
+            "the recommended portfolio stay inside the accepted drawdown. A cohort passes when every client does.")
+    st.markdown(scorecard_html(edge_scorecard(path, mtime)), unsafe_allow_html=True)
     st.caption("Model portfolios are illustrative ([ASSUMPTION] parameters in model_config.yaml, robo_advisor_simulator). "
                "Stress losses: equities -50%, fixed income -10%, cash 0%.")

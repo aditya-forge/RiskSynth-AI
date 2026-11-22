@@ -114,11 +114,22 @@ streamlit run app/streamlit_app.py      # then open http://localhost:8501
 |---|---|
 | Overview | Population figures, risk-tier mix against target, surplus distribution, edge-case cohort, capacity vs stated tolerance |
 | Architecture (linked from the overview) | Pipeline, output schema, consistency rules, risk-capacity caps, edge-case catalogue and calibration status |
-| Generator | Scenario presets (baseline, edge-case stress, capacity-constrained), then runs the rule-based, bootstrap or SDV engine with a chosen size, risk mix, edge-case share and seed; CSV, Parquet and JSON downloads |
-| Advisory Simulator | Cohort scorecard (baseline, EC01-EC09 edge cases, capacity-bound, re-profiling) with suitability flags and stressed losses, then the model portfolio per client under three rules (stated tolerance only, plus capacity and liquidity, plus a drawdown limit) and the resulting advisor actions |
-| Compliance & Fidelity | KS, Wasserstein and Jensen-Shannon tests against INE, correlation heatmaps, rule checks, downloadable HTML report |
+| Generator | Scenario presets (baseline, edge-case stress, capacity-constrained), then runs the rule-based, bootstrap or SDV engine with a chosen size, risk mix, edge-case share and seed; CSV, Parquet, JSON metadata and run-contract downloads |
+| Advisory Simulator | Cohort scorecard (baseline, EC01-EC09 edge cases, capacity-bound, re-profiling) with suitability flags and stressed losses; a counterfactual inspector that re-scores one client (capacity, CR01-CR07 and MiFID II checks, portfolio) as you change its inputs; the EC01-EC09 suitability scorecard; then the model portfolio per client under three rules (stated tolerance only, plus capacity and liquidity, plus a drawdown limit) and the resulting advisor actions |
+| Compliance & Fidelity | KS, Wasserstein and Jensen-Shannon tests against INE, correlation heatmaps, rule checks, the EC01-EC09 suitability scorecard, downloadable HTML report |
 
 The portal uses Streamlit's multipage navigation with a shared header, theme and dataset selector. On an empty deployment, the overview and analysis pages offer a one-click 2,000-client bootstrap demo; use the Generator for a configured run.
+
+### Run contracts
+
+Every run from the app writes `run_contract.json` next to the profiles. It records the engine, rows, seed, edge-case share and target risk mix, the EC01-EC09 target and achieved shares, CR01-CR07 and MiFID II results before and after repair, SHA-256 hashes of both configs, every `[ASSUMPTION]` parameter in them, and a content hash of the profiles. A test suite can regenerate and check the dataset:
+
+```python
+from risksynth import contract
+c = contract.load("data/synthetic/app_runs/<run>/run_contract.json")
+df = contract.reproduce(c)            # same code path as the app
+assert contract.verify(c, df) == []   # lists config, version, row or content drift
+```
 
 ### Reading CSV outputs
 
