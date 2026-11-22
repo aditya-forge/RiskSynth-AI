@@ -8,7 +8,8 @@ import pandas as pd
 import streamlit as st
 
 from portal import GITHUB_URL
-from portal.theme import palette
+from portal.icons import icon
+from portal.theme import mode, palette
 
 EC_SHORT = {"EC01": "High income, low liquidity", "EC02": "Young, high risk, low capital",
             "EC03": "Near-retiree, aggressive", "EC04": "Negative surplus investor",
@@ -40,16 +41,30 @@ NAV_LABELS = {"overview": "Product Overview", "architecture": "Solution Architec
               "compliance": "Compliance & Fidelity"}
 
 
-def header(pages: dict, current) -> None:
-    """Top navigation bar as one flex row: brand | page links + GitHub | call to action.
+def theme_switch() -> str:
+    """White / Dark switch: two icon buttons with labels for screen readers and tooltips.
 
-    Built from horizontal containers so every item sizes to its content (no truncation);
-    the links wrap onto a second line on narrow screens instead of overflowing.
+    A link rather than a widget, because the browser applies the theme when the page loads.
+    """
+    on = mode()
+    return ('<div class="rs rs-theme" role="group" aria-label="Colour theme">'
+            f'<a href="?embed_options=light_theme" target="_self" class="{"on" if on == "light" else ""}" '
+            f'title="White theme" aria-label="White theme" aria-pressed="{str(on == "light").lower()}">{icon("sun", 15)}</a>'
+            f'<a href="?embed_options=dark_theme" target="_self" class="{"on" if on == "dark" else ""}" '
+            f'title="Dark theme" aria-label="Dark theme" aria-pressed="{str(on == "dark").lower()}">{icon("moon", 15)}</a>'
+            '</div>')
+
+
+def header(pages: dict, current) -> None:
+    """Top navigation bar as one flex row: brand | page links + GitHub | theme switch + call to action.
+
+    Built from horizontal containers so every item sizes to its content; below 1180px the links
+    move to a second, horizontally scrollable row.
     """
     active = next((k for k, page in pages.items() if page.title == current.title), "overview")
     st.markdown(f"<style>.st-key-nav_{active} [data-testid='stPageLink'] a {{ border-bottom-color: "
                 f"{palette()['accent']} !important; }} .st-key-nav_{active} [data-testid='stPageLink'] p "
-                f"{{ color: {palette()['ink']} !important; }}</style>", unsafe_allow_html=True)
+                f"{{ color: {palette()['heading']} !important; }}</style>", unsafe_allow_html=True)
     with st.container(key="navbar", horizontal=True, vertical_alignment="center",
                       horizontal_alignment="distribute", gap=None):
         st.markdown(brand_html(), unsafe_allow_html=True, width="content")
@@ -57,20 +72,40 @@ def header(pages: dict, current) -> None:
             for key, label in NAV_LABELS.items():
                 with st.container(key=f"nav_{key}", width="content"):
                     st.page_link(pages[key], label=label)
-            with st.container(key="nav_github", width="content"):
-                st.page_link(GITHUB_URL, label="GitHub")
-        with st.container(key="cta", width="content"):
-            st.page_link(pages["generator"], label="Launch Workbench")
+            # wrapped in a div: inline HTML would otherwise get a <p> with a bottom margin
+            st.markdown(f'<div class="rs"><a class="rs-navext" href="{GITHUB_URL}" target="_blank" rel="noopener">'
+                        f'{icon("github", 15)}GitHub</a></div>', unsafe_allow_html=True, width="content")
+        with st.container(key="navtools", horizontal=True, vertical_alignment="center", width="content", gap=None):
+            st.markdown(theme_switch(), unsafe_allow_html=True, width="content")
+            with st.container(key="cta", width="content"):
+                st.page_link(pages["generator"], label="Launch Workbench")
 
 
 def footer() -> None:
+    why = [
+        ("code", "The full source, configs and INE processing code are public, so nothing about how a profile "
+                 "is built is hidden."),
+        ("terminal", "Every rule and edge case is covered by a pytest suite you can run on your own machine."),
+        ("refresh", "GitHub Actions runs the tests on every push to main, on Python 3.11 and 3.12."),
+        ("search", "Reviewers can trace the INE microdata handling, the MiFID II suitability rules and the "
+                   "EC01-EC09 edge-case profiles line by line."),
+    ]
+    items = "".join(f"<li>{icon(name, 15)}<span>{text}</span></li>" for name, text in why)
     st.markdown(
-        f'<div class="rs rs-footer"><div>{brand_html()}'
-        '<div style="margin-top:8px">Synthetic data for development and testing. '
-        'Not calibrated to any real client book; not investment advice.</div></div>'
-        '<div>Built on INE public microdata: ECV 2024, EPF 2024, EPA 2025 T3.<br>'
-        f'Source code: <a href="{GITHUB_URL}" target="_blank">github.com/aditya-forge/RiskSynth-AI</a> '
-        '&middot; MIT License</div></div>', unsafe_allow_html=True)
+        '<div class="rs rs-footer">'
+        f'<div>{brand_html()}<p style="margin-top:14px">Synthetic client risk profiles for building and testing '
+        'robo-advisors and suitability checks. Built on Spanish household survey microdata.</p></div>'
+        f'<div><div class="h">Why the code is on GitHub</div><ul>{items}</ul>'
+        '<p class="assume">Parameters marked [ASSUMPTION] are design choices, not measurements. Calibrate them '
+        'against the Banco de Espa&ntilde;a EFF 2022 survey before any production use.</p>'
+        f'<a class="repo" href="{GITHUB_URL}" target="_blank" rel="noopener">{icon("github", 15)}'
+        'aditya-forge/RiskSynth-AI</a></div>'
+        '<div><div class="h">Data</div><p>INE Encuesta de Condiciones de Vida 2024</p>'
+        '<p>INE Encuesta de Presupuestos Familiares 2024</p><p>INE Encuesta de Poblaci&oacute;n Activa 2025 T3</p>'
+        '<p>No real individuals appear in any generated record.</p></div>'
+        '<div class="legal"><span>Synthetic data for development and testing. Not calibrated to any real client '
+        'book and not investment advice.</span><span>RiskSynth AI 2.0.0</span></div>'
+        '</div>', unsafe_allow_html=True)
 
 
 def section(title: str, subtitle: str = "", eyebrow: str = "", first: bool = False) -> None:

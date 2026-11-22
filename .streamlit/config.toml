@@ -1,17 +1,25 @@
 # RiskSynth AI - Streamlit production settings
-# Dark, high-contrast, sharp-edged theme. The portal draws its own header and picks
-# matching chart colours if a viewer switches to light.
+# Two themes. The header switch loads the page with ?embed_options=light_theme or
+# dark_theme, which applies [theme.light] or [theme.dark] to Streamlit's own widgets;
+# the portal CSS and charts read the same option (app/portal/theme.py).
 
 [theme]
-base = "dark"
-primaryColor = "#1e88e5"
+primaryColor = "#1976d2"
+font = "sans serif"
+baseRadius = "small"
+showWidgetBorder = true
+
+[theme.light]
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f6f8fa"
+textColor = "#1f2328"
+borderColor = "#d0d7de"
+
+[theme.dark]
 backgroundColor = "#0e1117"
 secondaryBackgroundColor = "#161b22"
 textColor = "#e6edf3"
-font = "sans serif"
-baseRadius = "none"
-borderColor = "#333842"
-showWidgetBorder = true
+borderColor = "#30363d"
 
 [server]
 # No email prompt and no browser launch on startup (servers, containers, CI)
