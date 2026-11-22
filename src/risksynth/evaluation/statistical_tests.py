@@ -1,16 +1,16 @@
 """
-src/evaluation/statistical_tests.py
-Evaluación estadística de la calidad de datos sintéticos
+Legacy statistical tests from the original synth-bank-es project.
+
+Superseded by risksynth.evaluation.fidelity, which the app and the test suite use. Kept for
+existing notebooks; needs the optional loguru dependency (pip install -e ".[legacy-eval]").
 """
 
 import pandas as pd
 import numpy as np
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict
 from scipy import stats
 from scipy.spatial.distance import jensenshannon
-import matplotlib.pyplot as plt
-import seaborn as sns
 from loguru import logger
 
 

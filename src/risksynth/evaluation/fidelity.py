@@ -223,56 +223,119 @@ def run_all(df: pd.DataFrame, data_cfg: dict | None = None, model_cfg: dict | No
 # --------------------------------------------------------------------------- #
 # HTML report
 # --------------------------------------------------------------------------- #
+def _cell(value) -> tuple[str, str]:
+    """(text, css class) for one table cell: numbers right-aligned, PASS/FAIL coloured."""
+    if isinstance(value, (bool, np.bool_)):
+        return ("yes" if value else "no"), ""
+    if isinstance(value, (int, np.integer)):
+        return f"{int(value):,}", "num"
+    if isinstance(value, (float, np.floating)):
+        v = float(value)
+        text = f"{v:.2e}" if v != 0 and abs(v) < 1e-3 else f"{v:,.4g}"
+        return text, "num"
+    text = str(value)
+    if text in ("PASS", "FAIL"):
+        return text, text.lower()
+    return text, ""
+
+
 def _table(df: pd.DataFrame) -> str:
     if df is None or len(df) == 0:
         return "<p class='muted'>No data.</p>"
-    head = "".join(f"<th>{html.escape(str(c))}</th>" for c in df.columns)
-    body = []
+    head = []
+    for c in df.columns:
+        numeric = pd.api.types.is_numeric_dtype(df[c]) and not pd.api.types.is_bool_dtype(df[c])
+        head.append(f"<th class='{'num' if numeric else ''}'>{html.escape(str(c).replace('_', ' '))}</th>")
+    rows = []
     for _, row in df.iterrows():
         cells = []
         for c in df.columns:
-            v = row[c]
-            cls = " class='fail'" if c == "status" and v == "FAIL" else (" class='pass'" if c == "status" else "")
-            text = f"{v:.4g}" if isinstance(v, float) else str(v)
-            cells.append(f"<td{cls}>{html.escape(text)}</td>")
-        body.append("<tr>" + "".join(cells) + "</tr>")
-    return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(body)}</tbody></table>"
+            text, cls = _cell(row[c])
+            cells.append(f"<td class='{cls}'>{html.escape(text)}</td>")
+        rows.append("<tr>" + "".join(cells) + "</tr>")
+    return (f"<div class='tbl'><table><thead><tr>{''.join(head)}</tr></thead>"
+            f"<tbody>{''.join(rows)}</tbody></table></div>")
+
+
+def _passed(frame: pd.DataFrame) -> str:
+    return f"{int((frame['status'] == 'PASS').sum())} / {len(frame)}" if len(frame) else "n/a"
+
+
+REPORT_CSS = """
+:root { --bg:#ffffff; --panel:#f6f8fa; --ink:#1f2328; --ink2:#57606a; --line:#d8dee4; --rule:#d0d7de;
+        --accent:#1e88e5; --good:#1a7f37; --bad:#cf222e; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg:#050608; --panel:#0d1016; --ink:#d4dbe5; --ink2:#8b95a5; --line:#1a1f29; --rule:#232936;
+          --accent:#58a6ff; --good:#3fb950; --bad:#f85149; }
+}
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.55 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+main { max-width:1120px; margin:0 auto; padding:40px 24px 56px; }
+.eyebrow { font-size:11.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
+h1 { font-size:26px; font-weight:600; letter-spacing:-.01em; margin:8px 0 6px; }
+h2 { font-size:15px; font-weight:600; margin:36px 0 4px; }
+.sub, .muted { color:var(--ink2); }
+.sub { font-size:13px; margin:0 0 12px; }
+.meta { color:var(--ink2); font-size:13px; margin:0 0 24px; }
+.summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); border:1px solid var(--rule);
+           border-radius:2px; overflow:hidden; gap:1px; background:var(--line); }
+.summary div { background:var(--panel); padding:14px 16px; }
+.summary .l { font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ink2); }
+.summary .v { font:500 22px/1.3 ui-monospace, "JetBrains Mono", Consolas, monospace; margin-top:4px; }
+.tbl { border:1px solid var(--rule); border-radius:2px; overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th { text-align:left; font-weight:600; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink2);
+     background:var(--panel); padding:9px 12px; border-bottom:1px solid var(--rule); white-space:nowrap; }
+td { padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
+tbody tr:last-child td { border-bottom:none; }
+.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+td.pass, td.fail { font-weight:600; font-size:12px; letter-spacing:.04em; }
+td.pass { color:var(--good); } td.fail { color:var(--bad); }
+.note { border-left:2px solid var(--rule); padding:2px 0 2px 12px; color:var(--ink2); font-size:13px; margin:28px 0 0; }
+footer { margin-top:36px; padding-top:14px; border-top:1px solid var(--line); color:var(--ink2); font-size:12px; }
+"""
 
 
 def html_report(results: dict, dataset_name: str) -> str:
     corr = results["correlation"]
     corr_tbl = corr["difference"].round(3).reset_index().rename(columns={"index": "column"})
+    comp = results["compliance"]
+    summary = [("Numeric tests", _passed(results["numeric"])), ("Categorical tests", _passed(results["categorical"])),
+               ("Target mixes", _passed(results["target_mix"])), ("Correlation drift", f"{corr['mean_abs_diff']:.3f}"),
+               ("Unexpected violations", f"{int(comp['unexpected'].sum()):,}"),
+               ("Intentional exemptions", f"{int(comp['exempted'].sum()):,}")]
     sections = [
-        ("Numeric fidelity (KS, Wasserstein)", _table(results["numeric"])),
-        ("Categorical fidelity (Jensen-Shannon)", _table(results["categorical"])),
-        ("Target mixes (risk tier, ESG)", _table(results["target_mix"])),
-        (f"Spearman correlation difference, synthetic - reference "
-         f"(mean |diff| {corr['mean_abs_diff']}, max {corr['max_abs_diff']}: {corr['status']})", _table(corr_tbl)),
-        ("Expected dependencies", _table(results["dependencies"])),
-        ("Consistency rules CR01-CR07 and MiFID II checks (all rows)", _table(results["compliance"])),
+        ("Numeric fidelity", "Kolmogorov-Smirnov D and Wasserstein distance per column, against INE.", results["numeric"]),
+        ("Categorical fidelity", "Jensen-Shannon divergence and the largest share difference per column.",
+         results["categorical"]),
+        ("Target mixes", "Risk tier and ESG preference shares against the configured targets.", results["target_mix"]),
+        ("Correlation difference", f"Spearman rho, synthetic minus INE. Mean |diff| {corr['mean_abs_diff']}, "
+                                   f"max {corr['max_abs_diff']}: {corr['status']}.", corr_tbl),
+        ("Expected dependencies", "Sign and size of the relationships the profile engine is designed to produce.",
+         results["dependencies"]),
+        ("Consistency rules and MiFID II checks", "CR01-CR07 and the MiFID II checks on all rows. Exempted rows are "
+                                                  "intentional edge-case traits (EC08).", comp),
     ]
-    blocks = "".join(f"<h2>{html.escape(t)}</h2>{b}" for t, b in sections)
+    reference = ("INE persons base (ECV, EPF, EPA) for demographics and EPF households for finances"
+                 if results["reference_kind"] == "persons" else "INE EPF households")
+    cards = "".join(f"<div><div class='l'>{html.escape(l)}</div><div class='v'>{html.escape(v)}</div></div>"
+                    for l, v in summary)
+    blocks = "".join(f"<h2>{html.escape(t)}</h2><p class='sub'>{html.escape(d)}</p>{_table(f)}" for t, d, f in sections)
     return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<title>RiskSynth AI evaluation report</title>
-<style>
- body {{ font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; color:#1c1c1c;
-        margin: 40px auto; max-width: 1100px; padding: 0 16px; font-size: 14px; }}
- h1 {{ font-weight: 600; font-size: 22px; margin-bottom: 4px; }}
- h2 {{ font-weight: 600; font-size: 15px; margin-top: 32px; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }}
- .muted {{ color:#6b6b6b; }}
- table {{ border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }}
- th, td {{ text-align: left; padding: 6px 10px; border-bottom: 1px solid #eee; }}
- th {{ font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color:#555; }}
- td.pass {{ color:#0b6b0b; font-weight:600; }} td.fail {{ color:#b42318; font-weight:600; }}
-</style></head><body>
-<h1>RiskSynth AI &middot; Evaluation report</h1>
-<p class="muted">Dataset: {html.escape(dataset_name)} &middot; generated {results['generated_at']} &middot;
-reference: INE {'persons (ECV+EPF+EPA) and EPF households' if results['reference_kind'] == 'persons' else 'EPF households'}</p>
-<p>Rows: {results['rows_total']:,} total; fidelity tests on {results['rows_base_population']:,} base-population rows
-({results['rows_injected_excluded']:,} injected edge cases excluded). Constraint tests use all rows.</p>
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
+<title>RiskSynth AI evaluation report</title><style>{REPORT_CSS}</style></head><body><main>
+<div class="eyebrow">RiskSynth AI &middot; Evaluation report</div>
+<h1>{html.escape(dataset_name)}</h1>
+<p class="meta">Generated {results['generated_at']} &middot; reference: {reference}<br>
+{results['rows_total']:,} rows; fidelity tests on {results['rows_base_population']:,} base-population rows
+({results['rows_injected_excluded']:,} injected edge cases excluded); rule checks on all rows.</p>
+<div class="summary">{cards}</div>
 {blocks}
-<p class="muted" style="margin-top:40px">Synthetic data only. Not calibrated to any real client book; not investment advice.</p>
-</body></html>"""
+<p class="note">Parameters marked [ASSUMPTION] in the configs (risk-tier mix, ESG mix, goals by age, tolerance model,
+liquidity priors, simulator portfolios) are design choices, not measurements. Calibrate them against the
+Banco de Espa&ntilde;a EFF 2022 survey before any production use.</p>
+<footer>Synthetic data only. Not calibrated to any real client book; not investment advice.</footer>
+</main></body></html>"""
 
 
 def save_report(results: dict, dataset_name: str, out_dir: Path | None = None) -> Path:

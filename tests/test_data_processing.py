@@ -6,8 +6,7 @@ import pandas as pd
 import pytest
 
 from risksynth.ingest import ine as pdp
-
-ROOT_PROCESSED = pdp.PROJECT_ROOT / "data" / "processed"
+from risksynth.paths import PROCESSED_DIR as ROOT_PROCESSED
 
 
 @pytest.fixture(scope="module")

@@ -22,7 +22,6 @@ import pandas as pd
 import yaml
 
 from risksynth.paths import DATA_CONFIG, PROCESSED_DIR
-from risksynth.paths import ROOT as PROJECT_ROOT
 
 log = logging.getLogger(__name__)
 
