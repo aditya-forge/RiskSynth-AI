@@ -17,48 +17,39 @@ n_rules = len(cfg["wealth_profile_schema"]["consistency_rules"])
 # --------------------------------------------------------------------------- #
 # Hero
 # --------------------------------------------------------------------------- #
-hero, spec = st.columns([1.75, 1], gap="large", vertical_alignment="center")
+hero, spec = st.columns([1.8, 1], gap="large", vertical_alignment="top")
 with hero:
     st.markdown(
-        '<div class="rs" style="padding:34px 0 8px 0">'
-        '<div class="rs-eyebrow">RiskSynth AI &middot; Synthetic data for wealth management</div>'
-        '<div class="rs-h1">Synthetic client risk profiles for robo-advisory and wealth management</div>'
-        '<div class="rs-lead">Privacy-safe client data grounded in INE statistical microdata (ECV, EPF, EPA). '
+        '<div class="rs rs-hero">'
+        '<div class="eyebrow">RiskSynth AI &middot; Synthetic data for wealth management</div>'
+        '<h1>Synthetic client risk profiles for robo-advisory and wealth management</h1>'
+        '<p class="lead">Privacy-safe client data grounded in INE statistical microdata (ECV, EPF, EPA). '
         'Test portfolio-allocation models and stress-test MiFID II loss-bearing capacity across '
-        'edge-case cohorts EC01 to EC09.</div></div>', unsafe_allow_html=True)
-    b1, b2, _ = st.columns([1, 1.1, 2.2])
-    with b1.container(key="cta_hero"):
-        st.page_link(PAGES["generator"], label="Launch Workbench", width="stretch")
-    with b2.container(key="secondary_hero"):
-        st.page_link(PAGES["architecture"], label="View the architecture", width="stretch")
+        'edge-case cohorts EC01 to EC09.</p></div>', unsafe_allow_html=True)
+    with st.container(key="hero_ctas", horizontal=True, gap=None):
+        with st.container(key="hero_primary", width="content"):
+            st.page_link(PAGES["generator"], label="Launch Workbench")
+        with st.container(key="hero_secondary", width="content"):
+            st.page_link(PAGES["architecture"], label="View the architecture")
 with spec:
-    st.markdown(
-        '<div class="rs" style="border:1px solid var(--rs-line);background:var(--rs-panel);padding:18px 20px">'
-        '<div class="rs-label" style="margin-top:0">Specification</div><table class="rs-spec">'
-        '<tr><td>Data sources</td><td>INE ECV 2024, EPF 2024, EPA 2025 T3</td></tr>'
-        '<tr><td>Suitability model</td><td>MiFID II tolerance vs capacity</td></tr>'
-        f'<tr><td>Rules enforced</td><td>CR01-CR0{n_rules} and 3 MiFID II checks</td></tr>'
-        '<tr><td>Stress cohort</td><td>9 archetypes, 8% of rows by default</td></tr>'
-        '<tr><td>Engines</td><td>Rule-based, bootstrap sampler, SDV (optional)</td></tr>'
-        '<tr><td>Outputs</td><td>Parquet, CSV, JSON metadata, HTML report</td></tr>'
-        '<tr><td>License</td><td>MIT</td></tr></table></div>', unsafe_allow_html=True)
+    rows = [("Data sources", "INE ECV 2024, EPF 2024, EPA 2025 T3"),
+            ("Suitability model", "MiFID II tolerance vs capacity"),
+            ("Rules enforced", f"CR01-CR0{n_rules} and 3 MiFID II checks"),
+            ("Stress cohort", "9 archetypes, 8% of rows by default"),
+            ("Engines", "Rule-based, bootstrap sampler, SDV (optional)"),
+            ("Outputs", "Parquet, CSV, JSON metadata, HTML report"),
+            ("License", "MIT")]
+    st.markdown('<div class="rs rs-spec-card"><div class="title">Specification</div><table class="rs-spec">'
+                + "".join(f"<tr><td>{k}</td><td>{v}</td></tr>" for k, v in rows) + "</table></div>",
+                unsafe_allow_html=True)
 
+# Stats bar: every figure is computed or read from config, not typed in
 st.markdown(
-    '<style>.st-key-cta_hero [data-testid="stPageLink"] a { background:var(--rs-accent); border:1px solid var(--rs-accent);'
-    ' border-radius:0; justify-content:center; padding:8px 14px; }'
-    '.st-key-cta_hero [data-testid="stPageLink"] p { color:#fff !important; font-weight:600; }'
-    '.st-key-secondary_hero [data-testid="stPageLink"] a { border:1px solid var(--rs-rule); border-radius:0;'
-    ' justify-content:center; padding:8px 14px; background:transparent; }'
-    '.st-key-secondary_hero [data-testid="stPageLink"] p { color:var(--rs-ink) !important; font-weight:500; }</style>',
-    unsafe_allow_html=True)
-
-# Stats ribbon: every figure is computed or read from config, not typed in
-st.markdown(
-    '<div class="rs rs-grid rs-stats" style="margin-top:28px">'
-    f'<div class="rs-stat"><div class="v">{baseline_records():,}</div><div class="l">baseline INE microdata records</div></div>'
-    f'<div class="rs-stat"><div class="v">{len(cfg["edge_case_profiles"]["profiles"])}</div><div class="l">edge-case archetypes (EC01-EC09)</div></div>'
-    f'<div class="rs-stat"><div class="v">{n_rules} + 3</div><div class="l">consistency rules and MiFID II checks on every profile</div></div>'
-    '<div class="rs-stat"><div class="v">0</div><div class="l">real individuals in any generated record</div></div>'
+    '<div class="rs rs-statbar">'
+    f'<div><div class="v">{baseline_records():,}</div><div class="l">baseline INE microdata records</div></div>'
+    f'<div><div class="v">{len(cfg["edge_case_profiles"]["profiles"])}</div><div class="l">edge-case archetypes (EC01-EC09)</div></div>'
+    f'<div><div class="v">{n_rules} + 3</div><div class="l">consistency rules and MiFID II checks on every profile</div></div>'
+    '<div><div class="v">0</div><div class="l">real individuals in any generated record</div></div>'
     '</div>', unsafe_allow_html=True)
 
 # Pillars

@@ -17,7 +17,7 @@ THEMES = {
         "seq": ["#104281", "#b7d3f6"],
         "div": ["#e66767", "#2d333b", "#2a8ae6"],               # red, neutral grey midpoint, blue
         "ink": "#e6edf3", "ink2": "#8b949e", "ink3": "#6e7681",
-        "grid": "#21262d", "axis": "#30363d", "line": "#23272e", "rule": "#333842",
+        "grid": "#21262d", "axis": "#30363d", "line": "#21262d", "rule": "#30363d",
         "neutral": "#757575", "surface": "#0e1117", "panel": "#161b22", "accent": "#1e88e5",
         "good": "#3fb950", "bad": "#f85149",
     },
@@ -44,33 +44,102 @@ def inject_css() -> None:
     p = palette()
     st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap');
 
 :root {{ --rs-ink:{p['ink']}; --rs-ink2:{p['ink2']}; --rs-line:{p['line']}; --rs-rule:{p['rule']};
          --rs-panel:{p['panel']}; --rs-surface:{p['surface']}; --rs-accent:{p['accent']}; }}
 
 /* Streamlit chrome: the portal draws its own header */
-header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"] {{ display:none; }}
-.block-container {{ padding-top: 0.75rem; padding-bottom: 2rem; max-width: 1360px; }}
+header[data-testid="stHeader"], div[data-testid="stHeader"] {{ background:transparent; display:none; }}
+[data-testid="stToolbar"], [data-testid="stDecoration"] {{ display:none; }}
+.block-container, [data-testid="stMainBlockContainer"] {{ padding-top:0 !important; padding-bottom:2rem; max-width:1360px; }}
 
 .rs, .rs * {{ font-family: 'IBM Plex Sans', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }}
 .rs-mono {{ font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace !important; }}
 
-/* Header */
-.st-key-navbar {{ border-bottom: 1px solid var(--rs-line); padding: 6px 0 8px 0; margin-bottom: 6px; }}
-.rs-brand {{ display:flex; align-items:center; gap:10px; text-decoration:none; }}
-.rs-brand .word {{ font-size:18px; font-weight:600; letter-spacing:-0.01em; color:var(--rs-ink); }}
-.rs-brand .word b {{ color:var(--rs-accent); font-weight:600; }}
-.rs-brand .tag {{ font-size:11px; color:var(--rs-ink2); border-left:1px solid var(--rs-rule); padding-left:10px;
-                  letter-spacing:.02em; }}
-.st-key-navbar [data-testid="stPageLink"] a {{ border-radius:0; padding:6px 4px; background:transparent;
+/* Header: one 64px flex row; the background bleeds to the viewport edges */
+.st-key-navbar {{ min-height:64px; padding:0 16px; background:#0b0e14; position:sticky; top:0; z-index:1000;
+                  box-shadow:0 0 0 100vmax #0b0e14, 0 1px 0 100vmax #21262d; clip-path:inset(0 -100vmax -1px);
+                  margin-bottom:8px; flex-wrap:wrap; row-gap:4px; }}
+.rs-brand {{ display:flex; align-items:center; gap:10px; white-space:nowrap; }}
+.rs-brand svg {{ width:28px; height:28px; flex:none; display:block; }}
+.rs-brand .word {{ font-size:20px; font-weight:700; letter-spacing:-0.01em; color:#ffffff; line-height:1; }}
+.rs-brand .word b {{ color:#1e88e5; font-weight:700; }}
+.st-key-navlinks {{ gap:24px !important; flex-wrap:wrap; }}
+.st-key-navbar [data-testid="stPageLink"] a {{ border-radius:0; padding:20px 0 18px 0; background:transparent !important;
                   border-bottom:2px solid transparent; }}
-.st-key-navbar [data-testid="stPageLink"] a:hover {{ background:transparent; border-bottom-color:var(--rs-rule); }}
-.st-key-navbar [data-testid="stPageLink"] p {{ font-size:13.5px; font-weight:500; color:var(--rs-ink2); white-space:nowrap; }}
-.st-key-cta [data-testid="stPageLink"] a {{ background:var(--rs-accent) !important; border:1px solid var(--rs-accent) !important;
-                  border-radius:0; padding:7px 14px; justify-content:center; }}
-.st-key-cta [data-testid="stPageLink"] p {{ color:#ffffff !important; font-weight:600; }}
-.st-key-cta [data-testid="stPageLink"] a:hover {{ filter:brightness(1.1); }}
+.st-key-navbar [data-testid="stPageLink"] a:hover {{ border-bottom-color:#30363d; }}
+.st-key-navbar [data-testid="stPageLink"] p {{ font-size:14px; font-weight:500; color:#8b949e; white-space:nowrap; margin:0; }}
+.st-key-cta [data-testid="stPageLink"] a {{ background:#1e88e5 !important; border:none !important; border-radius:4px;
+                  height:36px; line-height:36px; padding:0 16px; display:flex; align-items:center; justify-content:center; }}
+.st-key-cta [data-testid="stPageLink"] p {{ color:#ffffff !important; font-size:13px; font-weight:600; white-space:nowrap; }}
+.st-key-cta [data-testid="stPageLink"] a:hover {{ background:#1976d2 !important; border-bottom:none; }}
+
+/* Style-only markdown blocks take no space (otherwise each adds a flex gap above the navbar) */
+[data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] style:only-child),
+[data-testid="stElementContainer"]:has(style):not(:has(.rs)) {{ display:none; }}
+.st-key-navbar [data-testid="stMarkdownContainer"], .st-key-navbar [data-testid="stMarkdown"] {{ margin:0 !important; }}
+.st-key-navbar [data-testid="stMarkdownContainer"] > div {{ margin:0; }}
+
+/* Narrow screens: row 1 brand + CTA, row 2 links as one scrollable strip */
+@media (max-width: 1100px) {{
+  .st-key-navbar {{ padding:8px 12px 0 12px; }}
+  /* Streamlit wraps each keyed container in a stLayoutWrapper: that wrapper is the flex item */
+  [data-testid="stLayoutWrapper"]:has(> .st-key-cta) {{ order:2; }}
+  [data-testid="stLayoutWrapper"]:has(> .st-key-navlinks) {{ order:3; flex:1 0 100%; width:100% !important;
+                      min-width:0; overflow:hidden; }}
+  .st-key-navlinks {{ width:100% !important; flex-wrap:nowrap !important; overflow-x:auto;
+                      scrollbar-width:none; gap:20px !important; }}
+  .st-key-navlinks::-webkit-scrollbar {{ display:none; }}
+  .st-key-navbar [data-testid="stPageLink"] a {{ padding:10px 0 8px 0; }}
+}}
+
+/* Hero */
+.rs-hero {{ padding:40px 0 0 0; }}
+.rs-hero .eyebrow {{ font-size:12px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:#58a6ff; }}
+.rs-hero h1 {{ font-size:38px; line-height:1.2; font-weight:700; color:#f0f6fc; margin:12px 0 16px 0; padding:0;
+               letter-spacing:-0.015em; }}
+.rs-hero .lead {{ font-size:15px; line-height:1.6; color:#8b949e; max-width:580px; margin:0 0 24px 0; }}
+.st-key-hero_ctas {{ gap:12px !important; }}
+.st-key-hero_ctas [data-testid="stPageLink"] a {{ height:40px; padding:0 18px; border-radius:4px; display:flex;
+                  align-items:center; justify-content:center; }}
+.st-key-hero_primary [data-testid="stPageLink"] a {{ background:#1e88e5 !important; border:1px solid #1e88e5 !important; }}
+.st-key-hero_primary [data-testid="stPageLink"] p {{ color:#ffffff !important; font-size:14px; font-weight:600; }}
+.st-key-hero_secondary [data-testid="stPageLink"] a {{ background:transparent !important; border:1px solid #30363d !important; }}
+.st-key-hero_secondary [data-testid="stPageLink"] a:hover {{ border-color:#8b949e !important; }}
+.st-key-hero_secondary [data-testid="stPageLink"] p {{ color:#e6edf3 !important; font-size:14px; font-weight:500; }}
+
+/* Specification card */
+.rs-spec-card {{ background:#161b22; border:1px solid #30363d; border-radius:6px; padding:20px; margin-top:40px; }}
+.rs-spec-card .title {{ font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:#8b949e;
+                        margin-bottom:6px; }}
+table.rs-spec, table.rs-spec tr, table.rs-spec td {{ border:none !important; background:transparent !important; }}
+table.rs-spec {{ width:100%; border-collapse:collapse; margin:0; }}
+table.rs-spec td {{ border-bottom:1px solid #21262d !important; padding:8px 0 !important; font-size:13px;
+                    vertical-align:top; color:#c9d1d9; }}
+table.rs-spec tr:last-child td {{ border-bottom:none !important; }}
+table.rs-spec td:first-child {{ color:#8b949e; width:40%; padding-right:12px !important; }}
+
+/* Stats ribbon: one connected bar */
+.rs-statbar {{ background:#161b22; border:1px solid #30363d; border-radius:6px; display:grid;
+               grid-template-columns:repeat(4, 1fr); margin-top:32px; overflow:hidden; }}
+.rs-statbar > div {{ padding:20px 24px; border-right:1px solid #21262d; }}
+.rs-statbar > div:last-child {{ border-right:none; }}
+.rs-statbar .v {{ font-family:'JetBrains Mono', ui-monospace, monospace !important; font-size:32px; font-weight:700;
+                  color:#f0f6fc; line-height:1.15; font-variant-numeric:tabular-nums; }}
+.rs-statbar .l {{ font-size:12px; color:#8b949e; margin-top:4px; line-height:1.4; }}
+@media (max-width: 900px) {{
+  .rs-statbar {{ grid-template-columns:repeat(2, 1fr); }}
+  .rs-statbar > div:nth-child(2n) {{ border-right:none; }}
+  .rs-statbar > div:nth-child(-n+2) {{ border-bottom:1px solid #21262d; }}
+  .rs-hero h1 {{ font-size:30px; }}
+}}
+@media (max-width: 520px) {{
+  .rs-statbar {{ grid-template-columns:1fr; }}
+  .rs-statbar > div {{ border-right:none; border-bottom:1px solid #21262d; }}
+  .rs-statbar > div:last-child {{ border-bottom:none; }}
+  .rs-hero h1 {{ font-size:26px; }}
+}}
 
 /* Section scaffolding */
 .rs-eyebrow {{ font-size:11.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--rs-accent); }}
@@ -83,7 +152,7 @@ header[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecor
 .rs-note {{ color:var(--rs-ink2); font-size:12.5px; }}
 
 /* Grids with hairline dividers: 1px gap on a line-coloured background */
-.rs-grid {{ display:grid; gap:1px; background:var(--rs-line); border:1px solid var(--rs-line); }}
+.rs-grid {{ display:grid; gap:1px; background:var(--rs-line); border:1px solid var(--rs-rule); border-radius:6px; overflow:hidden; }}
 .rs-grid > div {{ background:var(--rs-surface); }}
 .rs-kpis {{ grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }}
 .rs-kpi {{ padding:14px 16px 12px 16px; }}

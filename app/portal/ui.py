@@ -17,7 +17,7 @@ EC_SHORT = {"EC01": "High income, low liquidity", "EC02": "Young, high risk, low
             "EC09": "Asset-rich, cash-poor"}
 
 
-def logo_svg(size: int = 26) -> str:
+def logo_svg(size: int = 28) -> str:
     """Emblem: chart axes with an efficient-frontier curve through three portfolio nodes."""
     p = palette()
     return (f'<svg width="{size}" height="{size}" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" '
@@ -31,35 +31,41 @@ def logo_svg(size: int = 26) -> str:
             f'</svg>')
 
 
-def brand_html(tagline: bool = True) -> str:
-    tag = '<span class="tag">Synthetic client risk profiles</span>' if tagline else ""
-    return (f'<div class="rs rs-brand">{logo_svg()}<span class="word">RiskSynth <b>AI</b></span>{tag}</div>')
+def brand_html() -> str:
+    return f'<div class="rs rs-brand">{logo_svg(28)}<span class="word">RiskSynth <b>AI</b></span></div>'
+
+
+NAV_LABELS = {"overview": "Product Overview", "architecture": "Solution Architecture",
+              "generator": "Live Generator", "simulator": "Advisory Simulator",
+              "compliance": "Compliance & Fidelity"}
 
 
 def header(pages: dict, current) -> None:
-    """Top navigation bar: brand, page links, GitHub link and the primary call to action."""
-    labels = {"overview": "Product Overview", "architecture": "Solution Architecture",
-              "generator": "Live Generator", "simulator": "Advisory Simulator",
-              "compliance": "Compliance & Fidelity"}
+    """Top navigation bar as one flex row: brand | page links + GitHub | call to action.
+
+    Built from horizontal containers so every item sizes to its content (no truncation);
+    the links wrap onto a second line on narrow screens instead of overflowing.
+    """
     active = next((k for k, page in pages.items() if page.title == current.title), "overview")
     st.markdown(f"<style>.st-key-nav_{active} [data-testid='stPageLink'] a {{ border-bottom-color: "
                 f"{palette()['accent']} !important; }} .st-key-nav_{active} [data-testid='stPageLink'] p "
                 f"{{ color: {palette()['ink']} !important; }}</style>", unsafe_allow_html=True)
-    with st.container(key="navbar"):
-        cols = st.columns([2.3, 1.05, 1.25, 0.95, 1.1, 1.3, 0.6, 1.25], vertical_alignment="center", gap="small")
-        cols[0].markdown(brand_html(), unsafe_allow_html=True)
-        for col, key in zip(cols[1:6], labels):
-            with col.container(key=f"nav_{key}"):
-                st.page_link(pages[key], label=labels[key])
-        with cols[6].container(key="nav_github"):
-            st.page_link(GITHUB_URL, label="GitHub")
-        with cols[7].container(key="cta"):
-            st.page_link(pages["generator"], label="Launch Workbench", width="stretch")
+    with st.container(key="navbar", horizontal=True, vertical_alignment="center",
+                      horizontal_alignment="distribute", gap=None):
+        st.markdown(brand_html(), unsafe_allow_html=True, width="content")
+        with st.container(key="navlinks", horizontal=True, vertical_alignment="center", width="content", gap=None):
+            for key, label in NAV_LABELS.items():
+                with st.container(key=f"nav_{key}", width="content"):
+                    st.page_link(pages[key], label=label)
+            with st.container(key="nav_github", width="content"):
+                st.page_link(GITHUB_URL, label="GitHub")
+        with st.container(key="cta", width="content"):
+            st.page_link(pages["generator"], label="Launch Workbench")
 
 
 def footer() -> None:
     st.markdown(
-        f'<div class="rs rs-footer"><div>{brand_html(tagline=False)}'
+        f'<div class="rs rs-footer"><div>{brand_html()}'
         '<div style="margin-top:8px">Synthetic data for development and testing. '
         'Not calibrated to any real client book; not investment advice.</div></div>'
         '<div>Built on INE public microdata: ECV 2024, EPF 2024, EPA 2025 T3.<br>'
