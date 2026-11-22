@@ -1,3 +1,5 @@
+<img src="app/assets/logo.svg" width="56" height="56" alt="RiskSynth AI logo">
+
 # RiskSynth AI
 
 Synthetic client risk profiles for testing robo-advisors and MiFID II suitability engines, built from Spanish INE household survey microdata.
@@ -133,23 +135,73 @@ EC08 is the only archetype allowed to break a rule (CR02), and it must be flagge
 
 ## The workbench
 
-https://risksynth.streamlit.app/ has four sections plus a reference page. Every page has a Dark/White switch that applies to the page and its charts.
+https://risksynth.streamlit.app/ has four sections: Overview, Generator, Advisory Simulator, and Compliance & Fidelity. There is also an Architecture reference page, linked from the Overview. The screenshots below come from a 5,000-client bootstrap run with the default settings (seed 42, 8% edge cases).
 
-| View | What it shows |
-|---|---|
-| **Overview** | Problem statement and spec card, a stats bar computed from the data (INE baseline records, archetypes, rules), and a live population view: risk-tier mix against target, surplus distribution, edge-case cohort, and capacity against stated tolerance. |
-| **Generator** | Three test scenarios that fill the form: baseline mix, edge-case stress (EC01-EC09 at 15%), and capacity-constrained (mostly Aggressive or higher). The form picks the engine, sample size, edge-case share, seed and target risk mix. After a run: KPIs, the run contract (parameters, cohort target vs achieved, rule counts raw/after/exempt, `[ASSUMPTION]` list), and CSV, Parquet, JSON metadata and run-contract downloads. |
-| **Advisory Simulator** | A test-cohorts table (baseline, EC01-EC09, capacity-constrained, re-profiling) showing capacity binding, accepted drawdown against stressed losses, and breaches after advice. A counterfactual client inspector: change income, debt, savings, tolerance, horizon, drawdown, liquidity or goal and watch capacity, caps, CR01-CR07 and MiFID II checks, the suitability status and the three-step allocation update. Also the mean equity share per archetype under each rule, and the EC01-EC09 suitability scorecard. |
-| **Compliance & Fidelity** | KS and Wasserstein scorecards per column against INE, Jensen-Shannon tests, target mixes, Spearman correlation heatmaps, expected dependencies, CR01-CR07 and MiFID II audit, the EC01-EC09 scorecard, and a downloadable HTML evaluation report. |
-| Architecture (reference, linked from the Overview) | Pipeline stages, output schema, rule and cap tables, edge-case catalogue, calibration status. |
+### Overview
 
-The simulator's three allocations make each protection visible on its own:
+![Overview page in the dark theme: hero, specification card, stats bar and product pillars](docs/screenshots/overview-dark.png)
 
-1. **Tolerance only**: what a questionnaire-only advisor does.
-2. **Capacity and liquidity**: effective risk plus a cash sleeve of `0.5 x liquidity_need_pct`, clipped to 3-60%.
-3. **Drawdown limit**: equity is cut, then fixed income, until the stressed loss (equities -50%, fixed income -10%, cash 0%) fits inside `max_acceptable_drawdown_pct`.
+The problem in one paragraph, a spec card, and a stats bar computed from the data: INE baseline records, archetypes and rules. Below it is a live view of the active dataset: risk-tier mix against target, surplus distribution, the edge-case cohort, and capacity against stated tolerance. The sun and moon buttons switch between the Dark and White themes. Streamlit's widgets, the page and the charts all change together.
 
-A fresh deployment starts empty. The Overview, Simulator and Compliance pages offer a one-click 2,000-client bootstrap demo.
+<details>
+<summary>White theme</summary>
+
+![Overview page in the white theme](docs/screenshots/overview-white.png)
+
+</details>
+
+### Generator
+
+![Generator: three test scenarios above the engine, population and risk-mix form](docs/screenshots/generator-scenarios.png)
+
+Three test scenarios fill the form in one click:
+
+- **Baseline mix**: the configured mix with 8% edge cases.
+- **Edge-case stress**: EC01-EC09 at 15% of rows.
+- **Capacity-constrained**: most clients state Aggressive or higher.
+
+The form sets the engine, sample size, edge-case share, seed and target risk mix.
+
+![Run contract after a generation: parameters and hashes, EC01-EC09 target vs achieved shares, rule checks before and after repair](docs/screenshots/generator-run-contract.png)
+
+After a run, the page shows the run contract: parameters and config hashes, EC01-EC09 target vs achieved shares, and CR01-CR07 and MiFID II counts raw, after repair and exempted. The `[ASSUMPTION]` parameters are listed in a collapsible section. CSV, Parquet, JSON metadata and run-contract downloads sit below.
+
+### Advisory Simulator
+
+![Test cohorts table: capacity binding, accepted drawdown, stressed losses and breaches after advice per cohort](docs/screenshots/simulator-test-cohorts.png)
+
+The test-cohorts table compares baseline profiles, EC01-EC09 edge cases, capacity-constrained clients and re-profiling cases. For each it shows how often capacity binds, the accepted drawdown, the stressed loss of a tolerance-only portfolio (red) against the recommended one, and the share still over the limit after advice (green when zero).
+
+![Counterfactual client inspector: editable inputs, suitability status strip, and the three-step allocation](docs/screenshots/simulator-counterfactual.png)
+
+The counterfactual inspector takes any client, including EC01-EC09 cases. Change income, expenses, debt, savings, stated tolerance, horizon, accepted drawdown, liquidity need or goal, and the engine re-scores the profile:
+
+- suitability status;
+- risk capacity before and after the change;
+- effective risk and stressed loss;
+- capacity caps;
+- each CR01-CR07 and MiFID II check;
+- the edge-case assertion;
+- the allocation, in three steps:
+  1. **Tolerance only**: what a questionnaire-only advisor does.
+  2. **Capacity and liquidity**: effective risk plus a cash sleeve of `0.5 x liquidity_need_pct`, clipped to 3-60%.
+  3. **Drawdown limit**: equity is cut, then fixed income, until the stressed loss (equities -50%, fixed income -10%, cash 0%) fits inside `max_acceptable_drawdown_pct`.
+
+![EC01-EC09 suitability scorecard with assertion pass rate, cap fired, losses and PASS/FAIL per archetype](docs/screenshots/simulator-scorecard.png)
+
+The EC01-EC09 scorecard has one row per archetype: the written assertion and how often it holds, whether the expected capacity cap fired, accepted drawdown against stressed losses, breaches after advice, and PASS or FAIL. An archetype passes only when every one of its clients does.
+
+### Compliance & Fidelity
+
+![Compliance and fidelity: test summary and KS / Wasserstein scorecards per column](docs/screenshots/compliance-fidelity.png)
+
+A summary strip with numeric, categorical and target-mix tests, correlation drift, unexpected rule violations and intentional EC08 exemptions. Below it are KS D and normalised Wasserstein scorecards per column against the INE reference, with the pass limit drawn as a dashed line.
+
+![Spearman correlation heatmaps and expected dependency checks](docs/screenshots/compliance-correlation.png)
+
+Spearman correlation differences against INE, the correlation matrix of the profile features, and the expected-dependency checks. Further down are the CR01-CR07 and MiFID II audit, the EC01-EC09 scorecard, and a button that builds a self-contained HTML evaluation report.
+
+A fresh deployment starts empty. The Overview, Simulator and Compliance pages offer a one-click 2,000-client bootstrap demo. To refresh the screenshots, run the app and capture at 1440 x 900.
 
 ## Local setup
 
@@ -321,7 +373,7 @@ app/
 configs/                  data_config.yaml, model_config.yaml
 data/processed/           harmonised INE base (committed)
 data/synthetic/           generated datasets (not committed)
-docs/                     migration notes from the original credit-risk project
+docs/                     migration notes, screenshots/ used in this README
 src/risksynth/
   ingest/ine.py           INE ingestion and harmonisation
   engine/                 wealth_profile, consistency, edge_cases, stage2
@@ -331,6 +383,7 @@ src/risksynth/
   contract.py             run contracts: generate, build, reproduce, verify
   io.py, paths.py
 tests/
+scripts/build_brand_assets.py   regenerates app/assets/logo.svg and favicon.png from the mark in portal/icons.py
 archive/                  configs, app and notebooks from synth-bank-es
 Dockerfile, .github/workflows/ci.yml, .streamlit/config.toml
 ```

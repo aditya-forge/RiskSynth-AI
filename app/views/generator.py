@@ -131,7 +131,7 @@ if meta_file and meta_file.exists():
         section("Run contract", "Everything a model test suite needs to pin this dataset down. "
                 "<code>contract.reproduce()</code> regenerates it and <code>contract.verify()</code> reports any drift.")
         prm, coh, rc = c["parameters"], c["cohort_proportions"], c["rule_checks"]
-        left, mid, right = st.columns([1, 1.25, 1], gap="large")
+        left, mid, right = st.columns([0.85, 1.5, 1], gap="large")
         with left:
             facts = {"Engine": prm["method"] + (f" ({prm['stage1_model']})" if prm["stage1_model"] else ""),
                      "Rows": f"{prm['rows']:,}", "Seed": str(prm["seed"]),

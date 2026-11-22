@@ -225,6 +225,7 @@ table.rs-table th {{ text-align:left; font-weight:600; font-size:11px; text-tran
                      color:var(--rs-ink2); background:var(--rs-panel); padding:9px 12px; border-bottom:1px solid var(--rs-line); }}
 table.rs-table td {{ padding:9px 12px; border-bottom:1px solid var(--rs-line); color:var(--rs-ink); vertical-align:top;
                      overflow-wrap:anywhere; }}
+table.rs-table td:first-child {{ white-space:nowrap; overflow-wrap:normal; }}
 table.rs-table td code, .rs code {{ font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--rs-ink);
                      background:var(--rs-panel); border:1px solid var(--rs-line); padding:0 4px; border-radius:2px; }}
 
