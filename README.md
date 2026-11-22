@@ -1,6 +1,4 @@
-<img src="app/assets/logo.svg" width="56" height="56" alt="RiskSynth AI logo">
-
-# RiskSynth AI
+<h1><img src="app/assets/logo.svg" width="40" height="40" align="top" alt="">&nbsp;RiskSynth AI</h1>
 
 Synthetic client risk profiles for testing robo-advisors and MiFID II suitability engines, built from Spanish INE household survey microdata.
 
