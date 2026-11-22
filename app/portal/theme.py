@@ -17,15 +17,15 @@ TIER_ORDER = ["Conservative", "Moderate", "Aggressive", "Ultra-Aggressive"]
 
 THEMES = {
     "dark": {
-        "series": ["#2a8ae6", "#e0701e", "#16a085"],            # blue, amber, emerald (validated on #0e1117)
+        "series": ["#2a8ae6", "#e0701e", "#16a085"],            # blue, amber, emerald (validated on #050608 and #0d1016)
         "tiers": ["#184f95", "#2a78d6", "#5598e7", "#9ec5f4"],  # ordinal ramp, brighter = riskier
-        "seq": ["#104281", "#b7d3f6"],
-        "div": ["#e66767", "#2d333b", "#2a8ae6"],               # red, neutral grey midpoint, blue
-        "surface": "#0e1117", "panel": "#161b22", "nav": "#0b0e14",
-        "heading": "#f0f6fc", "ink": "#e6edf3", "ink2": "#8b949e", "ink3": "#6e7681",
-        "line": "#21262d", "rule": "#30363d", "grid": "#21262d", "axis": "#30363d",
+        "seq": ["#0f3a70", "#b7d3f6"],
+        "div": ["#e66767", "#1f242d", "#2a8ae6"],               # red, neutral grey midpoint, blue
+        "surface": "#050608", "panel": "#0d1016", "nav": "#090b0f",
+        "heading": "#eef2f7", "ink": "#d4dbe5", "ink2": "#8b95a5", "ink3": "#5f6878",
+        "line": "#1a1f29", "rule": "#232936", "grid": "#141821", "axis": "#232936",
         "eyebrow": "#58a6ff", "accent": "#1e88e5", "button": "#1976d2", "button_hover": "#1565c0",
-        "neutral": "#757575", "good": "#3fb950", "bad": "#f85149",
+        "neutral": "#6e7681", "good": "#3fb950", "bad": "#f85149",
     },
     "light": {
         "series": ["#2a78d6", "#eb6834", "#1baf7a"],            # validated on #ffffff
@@ -60,7 +60,7 @@ def inject_css() -> None:
     p = palette()
     st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=JetBrains+Mono:wght@500;700&display=swap');
 
 :root {{ --rs-surface:{p['surface']}; --rs-panel:{p['panel']}; --rs-nav:{p['nav']}; --rs-heading:{p['heading']};
          --rs-ink:{p['ink']}; --rs-ink2:{p['ink2']}; --rs-ink3:{p['ink3']}; --rs-line:{p['line']}; --rs-rule:{p['rule']};
@@ -70,7 +70,7 @@ def inject_css() -> None:
 /* Streamlit chrome: the portal draws its own header; no heading anchor icons */
 header[data-testid="stHeader"], div[data-testid="stHeader"] {{ background:transparent; display:none; }}
 [data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stHeaderActionElements"] {{ display:none !important; }}
-.block-container, [data-testid="stMainBlockContainer"] {{ padding-top:0 !important; padding-bottom:1.5rem; max-width:1360px; }}
+.block-container, [data-testid="stMainBlockContainer"] {{ padding-top:0 !important; padding-bottom:88px !important; max-width:1440px; }}
 /* Style-only markdown blocks take no space (otherwise each adds a gap above the navbar) */
 [data-testid="stElementContainer"]:has(> [data-testid="stMarkdown"] style:only-child),
 [data-testid="stElementContainer"]:has(style):not(:has(.rs)) {{ display:none; }}
@@ -87,8 +87,8 @@ header[data-testid="stHeader"], div[data-testid="stHeader"] {{ background:transp
 .st-key-navbar [data-testid="stMarkdownContainer"], .st-key-navbar [data-testid="stMarkdown"] {{ margin:0 !important; }}
 .rs-brand {{ display:flex; align-items:center; gap:10px; white-space:nowrap; }}
 .rs-brand svg {{ width:28px; height:28px; flex:none; display:block; }}
-.rs-brand .word {{ font-size:20px; font-weight:700; letter-spacing:-0.01em; color:var(--rs-heading); line-height:1; }}
-.rs-brand .word b {{ color:var(--rs-accent); font-weight:700; }}
+.rs-brand .word {{ font-size:20px; font-weight:600; letter-spacing:-0.01em; color:var(--rs-heading); line-height:1; }}
+.rs-brand .word b {{ color:var(--rs-accent); font-weight:600; }}
 .st-key-navlinks {{ gap:24px !important; flex-wrap:wrap; }}
 .st-key-navlinks [data-testid="stPageLink"], .st-key-navlinks [data-testid="stPageLink"] > div, .st-key-navlinks [data-testid="stPageLink"] a,
 .st-key-navlinks [data-testid="stElementContainer"], .st-key-navlinks [data-testid="stMarkdownContainer"] {{ margin:0 !important; padding:0 !important; }}
@@ -102,13 +102,13 @@ header[data-testid="stHeader"], div[data-testid="stHeader"] {{ background:transp
 .rs-navext:visited {{ color:var(--rs-ink2) !important; }}
 .rs-navext:hover {{ color:var(--rs-ink) !important; border-bottom-color:var(--rs-rule); }}
 .st-key-navtools {{ gap:12px !important; }}
-.rs-theme {{ display:inline-flex; border:1px solid var(--rs-rule); border-radius:4px; overflow:hidden; height:34px; }}
+.rs-theme {{ display:inline-flex; border:1px solid var(--rs-rule); border-radius:2px; overflow:hidden; height:34px; }}
 .rs-theme a {{ display:inline-flex; align-items:center; justify-content:center; width:34px; color:var(--rs-ink2) !important;
                text-decoration:none !important; }}
 .rs-theme a + a {{ border-left:1px solid var(--rs-rule); }}
 .rs-theme a.on {{ background:var(--rs-panel); color:var(--rs-heading) !important; }}
 .rs-theme a:hover {{ color:var(--rs-heading) !important; }}
-.st-key-cta [data-testid="stPageLink"] a {{ background:var(--rs-button) !important; border:none !important; border-radius:4px;
+.st-key-cta [data-testid="stPageLink"] a {{ background:var(--rs-button) !important; border:none !important; border-radius:2px;
                   height:36px; padding:0 16px; display:flex; align-items:center; justify-content:center; }}
 .st-key-cta [data-testid="stPageLink"] p {{ color:#ffffff !important; font-size:13px; font-weight:600; white-space:nowrap; }}
 .st-key-cta [data-testid="stPageLink"] a:hover {{ background:var(--rs-button-hover) !important; }}
@@ -128,11 +128,11 @@ header[data-testid="stHeader"], div[data-testid="stHeader"] {{ background:transp
 /* Hero */
 .rs-hero {{ padding:40px 0 0 0; }}
 .rs-hero .eyebrow {{ font-size:12px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--rs-eyebrow); }}
-.rs-hero h1 {{ font-size:38px; line-height:1.2; font-weight:700; color:var(--rs-heading); margin:12px 0 16px 0; padding:0;
+.rs-hero h1 {{ font-size:38px; line-height:1.2; font-weight:600; color:var(--rs-heading); margin:12px 0 16px 0; padding:0;
                letter-spacing:-0.015em; overflow-wrap:break-word; }}
 .rs-hero .lead {{ font-size:15px; line-height:1.6; color:var(--rs-ink2); max-width:600px; margin:0 0 24px 0; }}
 .st-key-hero_ctas {{ gap:12px !important; flex-wrap:wrap; }}
-.st-key-hero_ctas [data-testid="stPageLink"] a {{ height:40px; padding:0 18px; border-radius:4px; display:flex;
+.st-key-hero_ctas [data-testid="stPageLink"] a {{ height:40px; padding:0 18px; border-radius:2px; display:flex;
                   align-items:center; justify-content:center; }}
 .st-key-hero_primary [data-testid="stPageLink"] a {{ background:var(--rs-button) !important; border:1px solid var(--rs-button) !important; }}
 .st-key-hero_primary [data-testid="stPageLink"] a:hover {{ background:var(--rs-button-hover) !important; }}
@@ -142,7 +142,7 @@ header[data-testid="stHeader"], div[data-testid="stHeader"] {{ background:transp
 .st-key-hero_secondary [data-testid="stPageLink"] p {{ color:var(--rs-ink) !important; font-size:14px; font-weight:500; }}
 
 /* Specification card */
-.rs-spec-card {{ background:var(--rs-panel); border:1px solid var(--rs-rule); border-radius:6px; padding:20px; margin-top:40px; }}
+.rs-spec-card {{ background:var(--rs-panel); border:1px solid var(--rs-rule); border-radius:2px; padding:20px; margin-top:40px; }}
 .rs-spec-card .title {{ font-size:11px; font-weight:600; letter-spacing:1.5px; text-transform:uppercase; color:var(--rs-ink2);
                         margin-bottom:6px; }}
 table.rs-spec, table.rs-spec tr, table.rs-spec td {{ border:none !important; background:transparent !important; }}
@@ -153,11 +153,11 @@ table.rs-spec tr:last-child td {{ border-bottom:none !important; }}
 table.rs-spec td:first-child {{ color:var(--rs-ink2); width:40%; padding-right:12px !important; }}
 
 /* Stats bar: one connected bar */
-.rs-statbar {{ background:var(--rs-panel); border:1px solid var(--rs-rule); border-radius:6px; display:grid;
+.rs-statbar {{ background:var(--rs-panel); border:1px solid var(--rs-rule); border-radius:2px; display:grid;
                grid-template-columns:repeat(4, minmax(0, 1fr)); margin-top:32px; overflow:hidden; }}
 .rs-statbar > div {{ padding:20px 24px; border-right:1px solid var(--rs-line); min-width:0; }}
 .rs-statbar > div:last-child {{ border-right:none; }}
-.rs-statbar .v {{ font-family:'JetBrains Mono', ui-monospace, monospace !important; font-size:32px; font-weight:700;
+.rs-statbar .v {{ font-family:'JetBrains Mono', ui-monospace, monospace !important; font-size:30px; font-weight:500;
                   color:var(--rs-heading); line-height:1.15; font-variant-numeric:tabular-nums; }}
 .rs-statbar .l {{ font-size:12px; color:var(--rs-ink2); margin-top:4px; line-height:1.4; }}
 
@@ -170,16 +170,16 @@ table.rs-spec td:first-child {{ color:var(--rs-ink2); width:40%; padding-right:1
 .rs-note {{ color:var(--rs-ink2); font-size:12.5px; line-height:1.5; }}
 
 /* Grids with hairline dividers: 1px gap on a line-coloured background */
-.rs-grid {{ display:grid; gap:1px; background:var(--rs-line); border:1px solid var(--rs-rule); border-radius:6px; overflow:hidden; }}
+.rs-grid {{ display:grid; gap:1px; background:var(--rs-line); border:1px solid var(--rs-rule); border-radius:2px; overflow:hidden; }}
 .rs-grid > div {{ background:var(--rs-surface); min-width:0; }}
 .rs-kpis {{ grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); }}
 .rs-kpi {{ padding:14px 16px 12px 16px; }}
 .rs-kpi .l {{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--rs-ink2); font-weight:600; }}
-.rs-kpi .v {{ font-size:26px; font-weight:500; color:var(--rs-heading); font-variant-numeric:tabular-nums; margin-top:4px; line-height:1.25; }}
+.rs-kpi .v {{ font-family:'JetBrains Mono', ui-monospace, monospace !important; font-size:24px; font-weight:500; color:var(--rs-heading); font-variant-numeric:tabular-nums; margin-top:4px; line-height:1.25; }}
 .rs-kpi .n {{ font-size:12px; color:var(--rs-ink2); margin-top:2px; min-height:16px; }}
 .rs-pillars {{ grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); margin-top:28px; }}
 .rs-pillar {{ padding:22px 22px 24px 22px; }}
-.rs-pillar .icon {{ width:36px; height:36px; border:1px solid var(--rs-rule); border-radius:4px; display:flex;
+.rs-pillar .icon {{ width:36px; height:36px; border:1px solid var(--rs-rule); border-radius:2px; display:flex;
                     align-items:center; justify-content:center; color:var(--rs-accent); }}
 .rs-pillar .t {{ font-size:16px; font-weight:600; color:var(--rs-heading); margin:14px 0 8px 0; }}
 .rs-pillar .d {{ font-size:14px; line-height:1.6; color:var(--rs-ink2); }}
@@ -191,7 +191,7 @@ table.rs-table th {{ text-align:left; font-weight:600; font-size:11px; text-tran
 table.rs-table td {{ padding:9px 12px; border-bottom:1px solid var(--rs-line); color:var(--rs-ink); vertical-align:top;
                      overflow-wrap:anywhere; }}
 table.rs-table td code, .rs code {{ font-family:'IBM Plex Mono', monospace; font-size:12px; color:var(--rs-ink);
-                     background:var(--rs-panel); border:1px solid var(--rs-line); padding:0 4px; border-radius:3px; }}
+                     background:var(--rs-panel); border:1px solid var(--rs-line); padding:0 4px; border-radius:2px; }}
 
 /* Architecture flow */
 .rs-flow {{ grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); }}
@@ -211,27 +211,24 @@ dl.rs-facts dd {{ margin:0; font-weight:500; color:var(--rs-ink); font-variant-n
 .rs-action:last-child {{ border-bottom:none; }}
 .rs-action .ic {{ color:var(--rs-bad); margin-top:2px; }}
 .rs-action.ok .ic {{ color:var(--rs-good); }}
-.rs-expect {{ border:1px solid var(--rs-line); background:var(--rs-panel); padding:12px 14px; font-size:13.5px; border-radius:4px;
+.rs-expect {{ border:1px solid var(--rs-line); background:var(--rs-panel); padding:12px 14px; font-size:13.5px; border-radius:2px;
               margin-top:12px; color:var(--rs-ink); line-height:1.55; }}
 
-/* Footer */
-.rs-footer {{ border-top:1px solid var(--rs-line); margin-top:44px; padding-top:28px;
-              display:grid; grid-template-columns:minmax(0,1.1fr) minmax(0,1.6fr) minmax(0,1fr); gap:32px; }}
-.rs-footer .h {{ font-size:11px; font-weight:600; letter-spacing:.1em; text-transform:uppercase; color:var(--rs-ink2); margin-bottom:12px; }}
-.rs-footer p, .rs-footer li {{ font-size:13px; line-height:1.6; color:var(--rs-ink2); margin:0 0 8px 0; }}
-.rs-footer ul {{ list-style:none; padding:0; margin:0; }}
-.rs-footer li {{ display:flex; gap:10px; align-items:flex-start; }}
-.rs-footer li .ic {{ color:var(--rs-accent); margin-top:3px; }}
-.rs-footer .assume {{ border-left:2px solid var(--rs-rule); padding-left:10px; margin-top:12px; }}
-.rs-footer a.repo {{ display:inline-flex; align-items:center; gap:8px; margin-top:6px; padding:6px 12px; border:1px solid var(--rs-rule);
-                     border-radius:4px; color:var(--rs-ink) !important; font-size:13px; font-weight:500; }}
-.rs-footer a.repo:hover {{ border-color:var(--rs-ink2); }}
-.rs-footer .legal {{ grid-column:1 / -1; border-top:1px solid var(--rs-line); padding-top:14px; font-size:12px; color:var(--rs-ink3);
-                     display:flex; flex-wrap:wrap; justify-content:space-between; gap:8px 24px; }}
+/* Footer: two short rows. The bottom padding of the page keeps it clear of Streamlit Cloud's
+   floating "Manage app" button. */
+.rs-footer {{ border-top:1px solid var(--rs-line); margin-top:44px; padding-top:18px; font-size:13px; color:var(--rs-ink2); }}
+.rs-footer .row {{ display:flex; align-items:flex-start; gap:12px 32px; flex-wrap:wrap; }}
+.rs-footer .why {{ flex:1 1 520px; line-height:1.6; margin:0; max-width:880px; }}
+.rs-footer .why a {{ color:var(--rs-eyebrow) !important; white-space:nowrap; }}
+.rs-footer .why a:hover {{ text-decoration:underline !important; }}
+.rs-footer .why .ic {{ margin-right:4px; }}
+.rs-footer .legal {{ margin-top:14px; padding-top:12px; border-top:1px solid var(--rs-line); font-size:12px;
+                     color:var(--rs-ink3); line-height:1.5; padding-right:180px; }}
+@media (max-width: 640px) {{ .rs-footer .legal {{ padding-right:0; }} }}
 
 /* Widgets */
-[data-testid="stForm"], [data-testid="stExpander"] details, [data-testid="stVerticalBlockBorderWrapper"] {{ border-radius:6px !important; }}
-.stButton button, .stDownloadButton button, [data-testid="stFormSubmitButton"] button {{ border-radius:4px; }}
+[data-testid="stForm"], [data-testid="stExpander"] details, [data-testid="stVerticalBlockBorderWrapper"] {{ border-radius:2px !important; }}
+.stButton button, .stDownloadButton button, [data-testid="stFormSubmitButton"] button {{ border-radius:2px; }}
 
 @media (max-width: 480px) {{ .st-key-cta {{ display:none; }} }}
 @media (max-width: 900px) {{
@@ -239,7 +236,6 @@ dl.rs-facts dd {{ margin:0; font-weight:500; color:var(--rs-ink); font-variant-n
   .rs-statbar > div:nth-child(2n) {{ border-right:none; }}
   .rs-statbar > div:nth-child(-n+2) {{ border-bottom:1px solid var(--rs-line); }}
   .rs-hero h1 {{ font-size:30px; }}
-  .rs-footer {{ grid-template-columns:1fr; gap:24px; }}
 }}
 @media (max-width: 520px) {{
   .rs-statbar {{ grid-template-columns:1fr; }}

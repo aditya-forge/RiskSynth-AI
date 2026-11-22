@@ -6,7 +6,7 @@
 [theme]
 primaryColor = "#1976d2"
 font = "sans serif"
-baseRadius = "small"
+baseRadius = "2px"
 showWidgetBorder = true
 
 [theme.light]
@@ -16,10 +16,10 @@ textColor = "#1f2328"
 borderColor = "#d0d7de"
 
 [theme.dark]
-backgroundColor = "#0e1117"
-secondaryBackgroundColor = "#161b22"
-textColor = "#e6edf3"
-borderColor = "#30363d"
+backgroundColor = "#050608"
+secondaryBackgroundColor = "#0d1016"
+textColor = "#d4dbe5"
+borderColor = "#1a1f29"
 
 [server]
 # No email prompt and no browser launch on startup (servers, containers, CI)

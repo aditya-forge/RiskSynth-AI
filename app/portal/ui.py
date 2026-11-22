@@ -82,29 +82,16 @@ def header(pages: dict, current) -> None:
 
 
 def footer() -> None:
-    why = [
-        ("code", "The full source, configs and INE processing code are public, so nothing about how a profile "
-                 "is built is hidden."),
-        ("terminal", "Every rule and edge case is covered by a pytest suite you can run on your own machine."),
-        ("refresh", "GitHub Actions runs the tests on every push to main, on Python 3.11 and 3.12."),
-        ("search", "Reviewers can trace the INE microdata handling, the MiFID II suitability rules and the "
-                   "EC01-EC09 edge-case profiles line by line."),
-    ]
-    items = "".join(f"<li>{icon(name, 15)}<span>{text}</span></li>" for name, text in why)
     st.markdown(
-        '<div class="rs rs-footer">'
-        f'<div>{brand_html()}<p style="margin-top:14px">Synthetic client risk profiles for building and testing '
-        'robo-advisors and suitability checks. Built on Spanish household survey microdata.</p></div>'
-        f'<div><div class="h">Why the code is on GitHub</div><ul>{items}</ul>'
-        '<p class="assume">Parameters marked [ASSUMPTION] are design choices, not measurements. Calibrate them '
-        'against the Banco de Espa&ntilde;a EFF 2022 survey before any production use.</p>'
-        f'<a class="repo" href="{GITHUB_URL}" target="_blank" rel="noopener">{icon("github", 15)}'
-        'aditya-forge/RiskSynth-AI</a></div>'
-        '<div><div class="h">Data</div><p>INE Encuesta de Condiciones de Vida 2024</p>'
-        '<p>INE Encuesta de Presupuestos Familiares 2024</p><p>INE Encuesta de Poblaci&oacute;n Activa 2025 T3</p>'
-        '<p>No real individuals appear in any generated record.</p></div>'
-        '<div class="legal"><span>Synthetic data for development and testing. Not calibrated to any real client '
-        'book and not investment advice.</span><span>RiskSynth AI 2.0.0</span></div>'
+        '<div class="rs rs-footer"><div class="row">'
+        f'{brand_html()}'
+        '<p class="why">Source, pytest suite and GitHub Actions CI are public so the INE transformations, '
+        'MiFID II rules and EC01-EC09 edge cases can be audited line by line: '
+        f'<a href="{GITHUB_URL}" target="_blank" rel="noopener">{icon("github", 14)}aditya-forge/RiskSynth-AI</a>. '
+        'Parameters marked [ASSUMPTION] still need calibrating against the Banco de Espa&ntilde;a EFF 2022 survey.</p>'
+        '</div>'
+        '<div class="legal">Synthetic data built from INE ECV 2024, EPF 2024 and EPA 2025 T3. No real individuals, '
+        'not investment advice. RiskSynth AI 2.0.0</div>'
         '</div>', unsafe_allow_html=True)
 
 
