@@ -267,7 +267,7 @@ pytest --cov=risksynth       # with pytest-cov
 | `tests/test_wealth_engine.py` | Surplus identity, bucket and score boundaries, target mixes, capacity points and caps, rule validation and repair |
 | `tests/test_edge_cases.py` | Cohort size and quotas, scenario predicates and expected behaviour, EC08 exemption, share override, portfolio caps |
 | `tests/test_generators_alignment.py` | Mortgage and debt alignment with EPF, balance-derived credit fields, bootstrap sampler, behaviour without SDV, CSV reading, console encoding |
-| `tests/test_streamlit_app.py` | App renders all tabs; form validation |
+| `tests/test_streamlit_app.py` | Portal header and every page render; generator validation; demo dataset feeds the simulator and audit pages |
 
 SDV is optional. Without it, the SDV methods raise `ImportError` and the related test checks exactly that. CI runs the fast suite on every push and pull request to `main`; see [Continuous integration](#continuous-integration).
 
