@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Shared building blocks for the RiskSynth AI Streamlit portal."""
 import sys
 from pathlib import Path

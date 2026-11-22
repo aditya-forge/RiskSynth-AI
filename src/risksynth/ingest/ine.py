@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """
 INE microdata processor for RiskSynth AI.
 

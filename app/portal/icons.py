@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Inline SVG icons drawn on one 24x24 grid with a 1.75px stroke, so weight and size match.
 
 Icons use ``currentColor`` and inherit the colour of the surrounding text in either theme.

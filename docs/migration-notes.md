@@ -266,7 +266,7 @@ Slow end-to-end tests are marked `slow`. Fixtures never write to `data/processed
 - `README.md` was rewritten; `CONTEXT.md` is marked superseded.
 
 **Open for the owner.**
-- `pyproject.toml` declares MIT, but there is no `LICENSE` file; author metadata is a generic placeholder.
+- ~~`pyproject.toml` declares MIT, but there is no `LICENSE` file.~~ Resolved: the project is now proprietary (all rights reserved), see `LICENSE`.
 - `data/interim/legacy_v1_processed/` (the rebuild source when raw microdata is absent) is now git-ignored, so keep a copy outside git if you need to re-run `risksynth.ingest.ine --source legacy`.
 
 ### Repository layout (2026-11-22)

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Product overview: hero, value pillars and the live population view."""
 import altair as alt
 import numpy as np

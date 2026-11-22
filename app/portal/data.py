@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Dataset discovery, cached loaders and the generation runner shared by all pages."""
 from __future__ import annotations
 
@@ -132,7 +133,8 @@ def run_generation(method: str, sdv_model: str, n: int, edge_share: float, seed:
                                       edge_case_share=edge_share, risk_mix_pct=mix, report=report, frame=out, cfg=cfg)
         (run_dir / "run_contract.json").write_text(json.dumps(run_contract, indent=2, default=str, ensure_ascii=False),
                                                    encoding="utf-8")
-        meta = {"generated_at": started.isoformat(timespec="seconds"), "method": method,
+        meta = {"generated_at": started.isoformat(timespec="seconds"), "copyright": contract.COPYRIGHT,
+                "method": method,
                 "stage1_model": stage1, "rows": len(out), "seed": seed, "edge_case_share": edge_share,
                 "target_risk_mix_pct": mix,
                 "runtime_seconds": round((datetime.now() - started).total_seconds(), 1),

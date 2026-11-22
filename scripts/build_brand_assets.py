@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Write the brand assets from the geometry in app/portal/icons.py.
 
     python scripts/build_brand_assets.py

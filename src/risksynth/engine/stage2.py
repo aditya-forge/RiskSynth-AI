@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """
 Stage 2 + 3 orchestrator: resolve inputs -> derive wealth features -> validate (raw)
 -> enforce CR01-CR07 + MiFID II -> [stage 3] edge-case cohort EC01-EC09 with per-rule

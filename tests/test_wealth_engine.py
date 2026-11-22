@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Wealth feature engine, MiFID II risk capacity and consistency rules CR01-CR07."""
 from __future__ import annotations
 

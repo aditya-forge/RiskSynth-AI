@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Counterfactual re-assessment, the EC01-EC09 scorecard and run contracts."""
 from __future__ import annotations
 

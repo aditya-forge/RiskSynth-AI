@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Generator alignment with EPF data, stage-1 samplers, CSV reading and console encoding."""
 from __future__ import annotations
 

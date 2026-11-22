@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- License: MIT replaced by a proprietary, all-rights-reserved license. The code stays
+  visible for review; copying, reuse and deployment need written permission. Earlier
+  versions keep the MIT terms they were published under.
+- Copyright header on every Python file. Copyright notice in the app footer, the HTML
+  evaluation report, run contracts and run metadata.
+- Package metadata marks the project proprietary, with `Private :: Do Not Upload`, so it
+  cannot be uploaded to PyPI.
+
+### Added
+- `SECURITY.md` with private vulnerability reporting, Dependabot for pip, GitHub Actions
+  and Docker, and `CODEOWNERS`.
+
 ## 2.0.0 - 2026-11-22
 
 First release as RiskSynth AI. The project started as synth-bank-es, a synthetic

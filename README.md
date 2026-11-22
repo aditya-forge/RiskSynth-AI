@@ -6,6 +6,8 @@ Synthetic client risk profiles for testing robo-advisors and MiFID II suitabilit
 - **Repository:** https://github.com/aditya-forge/RiskSynth-AI
 - **Study guide:** [Learn_Guide.md](Learn_Guide.md), covering foundations, the maths, a module walkthrough, and viva and interview questions
 
+**License: proprietary, all rights reserved.** The code is published so it can be read and reviewed. Copying, modifying, redistributing or deploying any part of it needs written permission from the owner; see [LICENSE](LICENSE). Security issues: see [SECURITY.md](SECURITY.md).
+
 Synthetic data for development and testing. It is not calibrated to any real client book and it is not investment advice. Read [Calibration status](#calibration-status) before treating any distribution as a statistic about Spanish households.
 
 ## Contents
@@ -24,8 +26,8 @@ Synthetic data for development and testing. It is not calibrated to any real cli
 - [Deployment and CI](#deployment-and-ci)
 - [Tests](#tests)
 - [Project layout](#project-layout)
-- [Why the code is public](#why-the-code-is-public)
-- [Data sources and license](#data-sources-and-license)
+- [Why the code is visible](#why-the-code-is-visible)
+- [License, data sources and security](#license-data-sources-and-security)
 
 ## The problem
 
@@ -202,6 +204,8 @@ Spearman correlation differences against INE, the correlation matrix of the prof
 A fresh deployment starts empty. The Overview, Simulator and Compliance pages offer a one-click 2,000-client bootstrap demo. To refresh the screenshots, run the app and capture at 1440 x 900.
 
 ## Local setup
+
+For the owner and anyone with written permission to run the code (see [LICENSE](LICENSE)).
 
 Requires Python 3.10 or newer (CI runs 3.11 and 3.12).
 
@@ -383,15 +387,20 @@ src/risksynth/
 tests/
 scripts/build_brand_assets.py   regenerates app/assets/logo.svg and favicon.png from the mark in portal/icons.py
 archive/                  configs, app and notebooks from synth-bank-es
-Dockerfile, .github/workflows/ci.yml, .streamlit/config.toml
+Dockerfile, .github/workflows/ci.yml, .github/dependabot.yml, .github/CODEOWNERS, .streamlit/config.toml
+LICENSE, SECURITY.md      proprietary license and vulnerability reporting
 ```
 
-## Why the code is public
+## Why the code is visible
 
-The code is public so a reviewer can audit how a profile is built: the INE transformations, the MiFID II capacity rules and the EC01-EC09 definitions. The pytest suite and GitHub Actions CI let anyone confirm the rules and assertions hold. The `[ASSUMPTION]` parameters still need calibrating against Banco de España EFF 2022 before any production use.
+The code can be read on GitHub so a reviewer can audit how a profile is built: the INE transformations, the MiFID II capacity rules and the EC01-EC09 definitions. The pytest results and GitHub Actions CI runs show the rules and assertions hold. Being visible does not make it reusable; see below. The `[ASSUMPTION]` parameters still need calibrating against Banco de España EFF 2022 before any production use.
 
-## Data sources and license
+## License, data sources and security
 
-Built on INE public microdata: Encuesta de Condiciones de Vida 2024, Encuesta de Presupuestos Familiares 2024 and Encuesta de Población Activa 2025 T3. Use of derived data is subject to INE's terms of use.
+Copyright (c) 2026 aditya-forge. All rights reserved. RiskSynth AI is proprietary, not open source. You may view it on GitHub. Copying, modifying, redistributing, deploying or reusing any part of the code, documentation, study guide, logo or outputs needs prior written permission; see [LICENSE](LICENSE). To ask for permission, open an issue on the repository.
 
-Code released under the MIT License, see [LICENSE](LICENSE).
+Versions published before the license change (commit history before this notice) were released under MIT, and those copies keep that license.
+
+Built on INE public microdata: Encuesta de Condiciones de Vida 2024, Encuesta de Presupuestos Familiares 2024 and Encuesta de Población Activa 2025 T3. INE's terms of use apply to the derived data in `data/processed/`.
+
+Report vulnerabilities privately through the repository's Security tab, as described in [SECURITY.md](SECURITY.md).

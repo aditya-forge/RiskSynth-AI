@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """
 Stage 3 of the RiskSynth AI pipeline: edge-case stress-test cohort (EC01-EC09).
 

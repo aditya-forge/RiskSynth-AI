@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Reusable portal components: brand, header, footer, KPI grid, charts."""
 from __future__ import annotations
 
@@ -77,7 +78,8 @@ def footer() -> None:
         'Parameters marked [ASSUMPTION] still need calibrating against the Banco de Espa&ntilde;a EFF 2022 survey.</p>'
         '</div>'
         '<div class="legal">Synthetic data built from INE ECV 2024, EPF 2024 and EPA 2025 T3. No real individuals, '
-        'not investment advice. RiskSynth AI 2.0.0</div>'
+        'not investment advice. RiskSynth AI 2.0.0 &middot; &copy; 2026 aditya-forge. All rights reserved; '
+        f'not licensed for reuse (<a href="{GITHUB_URL}/blob/main/LICENSE" target="_blank" rel="noopener">license</a>).</div>'
         '</div>', unsafe_allow_html=True)
 
 

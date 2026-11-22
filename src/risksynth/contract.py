@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """
 Run contracts: the parameters, rule results and assumptions behind one generated dataset.
 
@@ -35,6 +36,8 @@ from risksynth.engine import wealth_profile as wp
 from risksynth.paths import DATA_CONFIG, MODEL_CONFIG, PROCESSED_DIR
 
 CONTRACT_VERSION = "1.0"
+COPYRIGHT = ("Generated with RiskSynth AI. Copyright (c) 2026 aditya-forge. All rights reserved; "
+             "not licensed for reuse without written permission. See LICENSE.")
 CALIBRATION_NOTE = ("Parameters marked [ASSUMPTION] are design choices, not measurements. Calibrate them against "
                     "the Banco de Espana EFF 2022 survey before any production use.")
 _ASSUMPTION = re.compile(r"\[ASSUMPTION\]\s*[:\-]?\s*(.*)$")
@@ -141,6 +144,7 @@ def build(*, method: str, stage1_model: str | None, sdv_model: str, rows: int, s
     enforced = report.get("violations_enforced", {})
     return {
         "contract_version": CONTRACT_VERSION,
+        "copyright": COPYRIGHT,
         "risksynth_version": __version__,
         "schema_version": str(cfg["project"]["schema_version"]),
         "parameters": {

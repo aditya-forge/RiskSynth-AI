@@ -1,21 +1,53 @@
-MIT License
+RiskSynth AI - Proprietary License
 
-Copyright (c) 2026 aditya-forge
+Copyright (c) 2026 aditya-forge. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This repository, including its source code, configuration files, tests,
+documentation, study material, logo, screenshots and generated example data
+(together, the "Software"), is the property of the copyright holder. It is
+published so that it can be read and reviewed. It is not open source.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+1. Permitted use
+   You may view the Software on GitHub and read it to evaluate or review the
+   project. Where GitHub's Terms of Service give GitHub users the right to view
+   and fork public repositories within GitHub, that right is respected; it
+   grants no permission beyond what those Terms require.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+2. Restrictions
+   Without prior written permission from the copyright holder, you may not:
+   a. copy, reproduce or download the Software, in whole or in part, except
+      as strictly needed to view it under section 1;
+   b. modify, adapt, translate or create derivative works based on it;
+   c. distribute, publish, sublicense, sell, lease or otherwise make it
+      available to anyone else;
+   d. deploy, host or run it as a service or application, or include it in
+      any other product, project, coursework or publication;
+   e. remove or alter this notice or any copyright notice in the Software;
+   f. use the Software, its outputs or its design to train, build or
+      benchmark another product.
+
+3. Permission requests
+   To ask for permission to use the Software, open an issue on
+   https://github.com/aditya-forge/RiskSynth-AI or contact the copyright
+   holder through their GitHub profile. Permission is only valid in writing.
+
+4. Third-party data
+   The harmonised data in data/processed/ is derived from INE public
+   microdata (ECV 2024, EPF 2024, EPA 2025 T3). INE's own terms of use apply
+   to that data and are not changed by this license.
+
+5. Earlier versions
+   This license applies to this version of the Software and every later one.
+   Versions published before this license was added keep the terms they were
+   published under.
+
+6. No warranty
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING
+   FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE. THE SOFTWARE
+   PRODUCES SYNTHETIC DATA AND IS NOT INVESTMENT ADVICE.
+
+Any use not expressly permitted above is prohibited and may infringe the
+copyright holder's rights.

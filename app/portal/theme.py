@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Colours, type and global CSS for the portal, for both the White and the Dark theme.
 
 The theme is chosen in the header (White / Dark). The choice travels in the URL as
@@ -260,6 +261,7 @@ dl.rs-facts dd {{ margin:0; font-weight:500; color:var(--rs-ink); font-variant-n
 .rs-footer .why .ic {{ margin-right:4px; }}
 .rs-footer .legal {{ margin-top:14px; padding-top:12px; border-top:1px solid var(--rs-line); font-size:12px;
                      color:var(--rs-ink3); line-height:1.5; padding-right:180px; }}
+.rs-footer .legal a {{ color:var(--rs-ink2) !important; text-decoration:underline !important; }}
 @media (max-width: 640px) {{ .rs-footer .legal {{ padding-right:0; }} }}
 
 /* Widgets */

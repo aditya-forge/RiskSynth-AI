@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """
 Edge-case suitability scorecard: one row per EC01-EC09 archetype.
 

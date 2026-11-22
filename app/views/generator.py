@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Live profile generator: configure a run, watch it, export the result."""
 import html
 import json

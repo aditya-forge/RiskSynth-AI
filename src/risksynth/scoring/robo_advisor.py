@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """
 Transparent model-portfolio engine for testing RiskSynth AI profiles.
 

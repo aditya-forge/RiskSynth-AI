@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Streamlit portal smoke tests (headless AppTest): header, every page, first-visit demo flow."""
 from __future__ import annotations
 

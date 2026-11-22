@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Edge-case cohort EC01-EC09, EC08 rule exemption and advisory allocation caps."""
 from __future__ import annotations
 

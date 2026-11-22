@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """
 Statistical fidelity and MiFID II / consistency compliance for RiskSynth AI datasets.
 
@@ -334,7 +335,8 @@ def html_report(results: dict, dataset_name: str) -> str:
 <p class="note">Parameters marked [ASSUMPTION] in the configs (risk-tier mix, ESG mix, goals by age, tolerance model,
 liquidity priors, simulator portfolios) are design choices, not measurements. Calibrate them against the
 Banco de Espa&ntilde;a EFF 2022 survey before any production use.</p>
-<footer>Synthetic data only. Not calibrated to any real client book; not investment advice.</footer>
+<footer>Synthetic data only. Not calibrated to any real client book; not investment advice.<br>
+Generated with RiskSynth AI. &copy; 2026 aditya-forge. All rights reserved; not licensed for reuse.</footer>
 </main></body></html>"""
 
 

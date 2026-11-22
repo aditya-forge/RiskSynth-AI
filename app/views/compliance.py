@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Statistical fidelity against INE and the rule / MiFID II compliance audit."""
 from pathlib import Path
 

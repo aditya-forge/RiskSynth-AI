@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """
 Consistency rules CR01-CR07 and MiFID II suitability checks for wealth profiles.
 

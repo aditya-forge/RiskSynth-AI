@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Solution architecture: pipeline, output schema, rules and the edge-case catalogue."""
 import html
 

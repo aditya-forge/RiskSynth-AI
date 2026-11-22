@@ -7,6 +7,8 @@ Every number in the worked examples was produced by the project's own code (`ris
 - Live workbench: https://risksynth.streamlit.app/
 - Repository: https://github.com/aditya-forge/RiskSynth-AI
 
+Copyright (c) 2026 aditya-forge. All rights reserved. This guide is part of RiskSynth AI and is covered by its [LICENSE](LICENSE); do not copy or republish it without permission.
+
 ## Contents
 
 **Part 1. Foundations**

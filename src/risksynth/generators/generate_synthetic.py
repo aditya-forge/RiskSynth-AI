@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """
 Generador de datos bancarios sintéticos para España (ML).
 Basado en microdatos INE + estructura WealthReader.

@@ -7,11 +7,13 @@ name = "risksynth-ai"
 version = "2.0.0"                      # matches configs schema_version 2.0.0
 description = "RiskSynth AI: synthetic client risk profiles for robo-advisory and wealth management, calibrated on INE microdata"
 readme = "README.md"
-authors = [{ name = "RiskSynth AI contributors" }]
-license = { text = "MIT" }
+authors = [{ name = "aditya-forge" }]
+license = { text = "Proprietary. All rights reserved. See LICENSE." }
 requires-python = ">=3.10"
 keywords = ["synthetic-data", "robo-advisor", "mifid-ii", "wealth-management", "ine", "risk-profiling"]
 classifiers = [
+    "License :: Other/Proprietary License",
+    "Private :: Do Not Upload",
     "Programming Language :: Python :: 3",
     "Intended Audience :: Financial and Insurance Industry",
     "Intended Audience :: Science/Research",

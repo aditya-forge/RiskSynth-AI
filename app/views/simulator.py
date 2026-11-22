@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Robo-advisory simulator: allocation per client and protection per stress profile."""
 import html
 

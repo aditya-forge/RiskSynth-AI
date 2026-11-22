@@ -1,3 +1,4 @@
+# Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Repository locations shared by the package, the CLI tools and the app.
 
 The package is meant to be used from a checkout (pip install -e .): configs and data
