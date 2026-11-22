@@ -1,5 +1,6 @@
 # Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Edge-case cohort EC01-EC09, EC08 rule exemption and advisory allocation caps."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -68,8 +69,16 @@ def test_ec02_requires_long_horizon(data_cfg, profiles):
 
 
 def test_tags_and_origins(profiles):
-    for col in ["edge_case_id", "edge_case_matches", "edge_case_origin", "is_edge_case", "expected_robo_behavior",
-                "expected_capacity_override", "edge_case_assertion_pass", "edge_case_mutated_fields"]:
+    for col in [
+        "edge_case_id",
+        "edge_case_matches",
+        "edge_case_origin",
+        "is_edge_case",
+        "expected_robo_behavior",
+        "expected_capacity_override",
+        "edge_case_assertion_pass",
+        "edge_case_mutated_fields",
+    ]:
         assert col in profiles, col
     assert (profiles["is_edge_case"] == profiles["edge_case_id"].notna()).all()
     assert set(profiles["edge_case_origin"].unique()) <= {"natural", "injected", "none"}
@@ -99,18 +108,20 @@ def test_exemption_is_per_rule_and_per_row(profiles, data_cfg):
     t = profiles.copy()
     e8 = t.index[t["edge_case_id"].eq("EC08").fillna(False)][:15]
     other = t.index[t["edge_case_id"].isna()][:15]
-    t.loc[e8, "risk_tolerance_category"] = "Conservative"            # CR01 on EC08: must be repaired
+    t.loc[e8, "risk_tolerance_category"] = "Conservative"  # CR01 on EC08: must be repaired
     t.loc[other, "risk_tolerance_score"] = 1
     t.loc[other, "risk_tolerance_category"] = "Conservative"
-    t.loc[other, "max_acceptable_drawdown_pct"] = 40.0                # CR02 off-cohort: must be repaired
+    t.loc[other, "max_acceptable_drawdown_pct"] = 40.0  # CR02 off-cohort: must be repaired
     fixed, repairs = consistency.enforce(t, data_cfg, np.random.default_rng(0), ec.exemptions(t, data_cfg))
     m = consistency.rule_masks(fixed, data_cfg)
     assert not m.loc[e8, "CR01"].any()
     assert m.loc[e8, "CR02"].all(), "EC08's intentional contradiction survives"
     assert not m.loc[other, "CR02"].any()
     assert repairs["CR01"] >= 15
-    assert (fixed["effective_risk_score"]
-            == np.minimum(fixed["risk_tolerance_score"], fixed["risk_capacity_score"])).all()
+    assert (
+        fixed["effective_risk_score"]
+        == np.minimum(fixed["risk_tolerance_score"], fixed["risk_capacity_score"])
+    ).all()
 
 
 # --------------------------------------------------------------------------- #
@@ -154,7 +165,9 @@ def test_stress_profiles_are_protected(advice, profiles):
     by = pd.concat([profiles["edge_case_id"].fillna("base"), advice], axis=1).groupby("edge_case_id")
     equity = by[["naive_equity_pct", "rec_equity_pct"]].mean()
     assert equity.loc["EC05", "rec_equity_pct"] < equity.loc["EC05", "naive_equity_pct"] - 20
-    assert equity.loc["EC08", "rec_equity_pct"] < 5, "EC08's 5-10% drawdown limit forces a defensive portfolio"
+    assert (
+        equity.loc["EC08", "rec_equity_pct"] < 5
+    ), "EC08's 5-10% drawdown limit forces a defensive portfolio"
     ec08 = profiles["edge_case_id"].eq("EC08").fillna(False)
     assert advice.loc[ec08, "action_reprofile"].all()
     ec04 = profiles["edge_case_id"].eq("EC04").fillna(False)

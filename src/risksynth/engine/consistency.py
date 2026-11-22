@@ -10,6 +10,7 @@ Rules come from data_config.yaml (wealth_profile_schema.consistency_rules / .enf
 and compliance.mifid2_suitability. `exempt` maps rule ids to row masks that may legitimately
 break a rule (edge-case scenarios: EC08 relaxes CR02).
 """
+
 from __future__ import annotations
 
 import logging
@@ -17,8 +18,14 @@ import logging
 import numpy as np
 import pandas as pd
 
-from .wealth_profile import (bucket_from_years, category_from_score, compute_capacity,
-                             sample_goal, sample_horizon, schema)
+from .wealth_profile import (
+    bucket_from_years,
+    category_from_score,
+    compute_capacity,
+    sample_goal,
+    sample_horizon,
+    schema,
+)
 
 log = logging.getLogger(__name__)
 CR_IDS = ["CR01", "CR02", "CR03", "CR04", "CR05", "CR06", "CR07"]
@@ -67,28 +74,37 @@ def rule_masks(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
         "CR06": (df["investable_surplus_eur"] - df["raw_surplus_eur"].clip(lo, hi)).abs() > 0.5,
         "CR07": goal.eq("Capital Preservation") & (years > c["preservation_max"]),
         "MIFID_EFFECTIVE_RISK": df["effective_risk_score"].ne(
-            np.minimum(df["risk_tolerance_score"], df["risk_capacity_score"])),
+            np.minimum(df["risk_tolerance_score"], df["risk_capacity_score"])
+        ),
         "MIFID_CAPACITY_CURRENT": df["risk_capacity_score"].ne(recomputed["risk_capacity_score"]),
         "MIFID_ESG_COLLECTED": df["esg_preference_level"].isna(),
     }
     return pd.DataFrame(masks, index=df.index).fillna(True).astype(bool)
 
 
-def validate(df: pd.DataFrame, cfg: dict, exempt: dict | None = None,
-             stage: str = "") -> tuple[pd.DataFrame, dict]:
+def validate(
+    df: pd.DataFrame, cfg: dict, exempt: dict | None = None, stage: str = ""
+) -> tuple[pd.DataFrame, dict]:
     """Violation masks (exempt rows cleared) and counts; logs one line per rule."""
     masks = rule_masks(df, cfg)
     for rule, mask in (exempt or {}).items():
         masks[rule] &= ~mask.reindex(df.index, fill_value=False)
     counts = {rule: int(masks[rule].sum()) for rule in masks}
     for rule, n in counts.items():
-        log.log(logging.WARNING if n else logging.INFO, "[%s] %-22s %7d violations (%.2f%%)",
-                stage, rule, n, 100 * n / max(len(df), 1))
+        log.log(
+            logging.WARNING if n else logging.INFO,
+            "[%s] %-22s %7d violations (%.2f%%)",
+            stage,
+            rule,
+            n,
+            100 * n / max(len(df), 1),
+        )
     return masks, counts
 
 
-def enforce(df: pd.DataFrame, cfg: dict, rng: np.random.Generator,
-            exempt: dict | None = None) -> tuple[pd.DataFrame, dict]:
+def enforce(
+    df: pd.DataFrame, cfg: dict, rng: np.random.Generator, exempt: dict | None = None
+) -> tuple[pd.DataFrame, dict]:
     """Repair CR violations in config order; returns the repaired frame and repair counts."""
     c = _ctx(cfg)
     df = df.copy()
@@ -105,14 +121,15 @@ def enforce(df: pd.DataFrame, cfg: dict, rng: np.random.Generator,
             continue
         _REPAIRS[rule](df, mask, c, cfg, rng)
         repaired[mask] = repaired[mask] + "|" + rule
-    df = compute_capacity(df, cfg)            # capacity/effective risk depend on repaired fields
+    df = compute_capacity(df, cfg)  # capacity/effective risk depend on repaired fields
     df["cr_repaired"] = repaired.str.lstrip("|").replace("", pd.NA)
     return df, counts
 
 
 def _repair_cr01(df, m, c, cfg, rng):
-    df.loc[m, "risk_tolerance_category"] = category_from_score(df.loc[m, "risk_tolerance_score"],
-                                                               c["categories"])
+    df.loc[m, "risk_tolerance_category"] = category_from_score(
+        df.loc[m, "risk_tolerance_score"], c["categories"]
+    )
 
 
 def _repair_cr02(df, m, c, cfg, rng):
@@ -123,7 +140,8 @@ def _repair_cr02(df, m, c, cfg, rng):
 
 def _repair_cr03(df, m, c, cfg, rng):
     df.loc[m, "investment_horizon_bucket"] = bucket_from_years(
-        df.loc[m, "investment_horizon_years"], c["buckets"])
+        df.loc[m, "investment_horizon_years"], c["buckets"]
+    )
 
 
 def _repair_cr04(df, m, c, cfg, rng):
@@ -136,8 +154,9 @@ def _repair_cr04(df, m, c, cfg, rng):
 
 
 def _repair_cr05(df, m, c, cfg, rng):
-    df.loc[m, "investment_horizon_years"] = np.minimum(df.loc[m, "investment_horizon_years"],
-                                                       _horizon_cap(df.loc[m], c))
+    df.loc[m, "investment_horizon_years"] = np.minimum(
+        df.loc[m, "investment_horizon_years"], _horizon_cap(df.loc[m], c)
+    )
     _repair_cr03(df, m, c, cfg, rng)
 
 
@@ -148,12 +167,20 @@ def _repair_cr06(df, m, c, cfg, rng):
 
 def _repair_cr07(df, m, c, cfg, rng):
     df.loc[m, "investment_horizon_years"] = df.loc[m, "investment_horizon_years"].clip(
-        upper=c["preservation_max"])
+        upper=c["preservation_max"]
+    )
     _repair_cr03(df, m, c, cfg, rng)
 
 
-_REPAIRS = {"CR01": _repair_cr01, "CR02": _repair_cr02, "CR03": _repair_cr03, "CR04": _repair_cr04,
-            "CR05": _repair_cr05, "CR06": _repair_cr06, "CR07": _repair_cr07}
+_REPAIRS = {
+    "CR01": _repair_cr01,
+    "CR02": _repair_cr02,
+    "CR03": _repair_cr03,
+    "CR04": _repair_cr04,
+    "CR05": _repair_cr05,
+    "CR06": _repair_cr06,
+    "CR07": _repair_cr07,
+}
 
 
 def exempted_counts(df: pd.DataFrame, cfg: dict, exempt: dict | None) -> dict:
@@ -161,8 +188,9 @@ def exempted_counts(df: pd.DataFrame, cfg: dict, exempt: dict | None) -> dict:
     if not exempt:
         return {}
     masks = rule_masks(df, cfg)
-    return {rule: int((masks[rule] & m.reindex(df.index, fill_value=False)).sum())
-            for rule, m in exempt.items()}
+    return {
+        rule: int((masks[rule] & m.reindex(df.index, fill_value=False)).sum()) for rule, m in exempt.items()
+    }
 
 
 def violation_labels(masks: pd.DataFrame, rules: list[str] = CR_IDS) -> pd.Series:

@@ -1,5 +1,6 @@
 # Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """INE microdata ingestion (risksynth.ingest.ine)."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -25,12 +26,20 @@ def harm(data_cfg):
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 def ecv_tables():
-    personas = pd.DataFrame({
-        "PB030": [101, 102, 201, 301], "PB040": [500.0, 500.0, 800.0, 300.0], "PB110": [2024] * 4,
-        "PB140": [1980, 1938, 2000, 1990], "PB150": [1, 2, 2, 1],
-        "PE041": ["500", "200", "344", "000"], "PL032": ["1", "3", "5", "2"],
-        "PY010G": [30000.0, 0.0, 5000.0, 0.0], "PY010N": [24000.0, 0.0, 4500.0, 0.0],
-        "PY100N": [0.0, 15000.0, 0.0, 0.0]})
+    personas = pd.DataFrame(
+        {
+            "PB030": [101, 102, 201, 301],
+            "PB040": [500.0, 500.0, 800.0, 300.0],
+            "PB110": [2024] * 4,
+            "PB140": [1980, 1938, 2000, 1990],
+            "PB150": [1, 2, 2, 1],
+            "PE041": ["500", "200", "344", "000"],
+            "PL032": ["1", "3", "5", "2"],
+            "PY010G": [30000.0, 0.0, 5000.0, 0.0],
+            "PY010N": [24000.0, 0.0, 4500.0, 0.0],
+            "PY100N": [0.0, 15000.0, 0.0, 0.0],
+        }
+    )
     hogares = pd.DataFrame({"HB030": [1, 2], "HY020": [41000.5, 18000.0]})
     registro = pd.DataFrame({"DB030": [1, 2, 3], "DB040": ["ES30", "ES51", "ES61"], "DB090": [700, 900, 400]})
     return {"personas": personas, "hogares": hogares, "registro_hogares": registro}
@@ -78,18 +87,29 @@ def test_ecv_code_harmonization(ecv_tables, mapping, harm):
 # --------------------------------------------------------------------------- #
 @pytest.fixture
 def epf_hogar():
-    return pd.DataFrame({
-        "FACTOR": [1000.0, 500.0, 250.0],
-        "GASTOT": [30_000_000.0, 10_000_000.0, 5_000_000.0],
-        "GASTMON": [22_000_000.0, 8_000_000.0, 4_000_000.0],
-        "IMPEXAC": [2500.0, -9.0, 0.0],             # exact, missing, zero -> bracket fallback
-        "INTERIN": [6, 3, 1],
-        "IMPEXACSP": [1800.0, -9.0, -9.0],          # main earner's INCOME: the old 'gasto_total' bug
-        "CAPITMENS": [400.0, np.nan, -0.1], "INTERESMENS": [100.0, np.nan, 0.0],
-        "VALOREST": [200000.0, -9.0, 90000.0],
-        "CCAA": [13, 9, 19], "NMIEMB": [3, 1, 2], "REGTEN": [2, 1, 1],
-        "EDADSP": [45, 70, 30], "SEXOSP": [1, 6, 6], "ESTUDIOSSP": [7, 3, 5], "SITUACTSP": [1, 3, 1],
-        "NHIJOSD": [1, 0, 0], "NUMOCUP": [2, 0, 1], "TIPOCONT": [1, np.nan, 2]})
+    return pd.DataFrame(
+        {
+            "FACTOR": [1000.0, 500.0, 250.0],
+            "GASTOT": [30_000_000.0, 10_000_000.0, 5_000_000.0],
+            "GASTMON": [22_000_000.0, 8_000_000.0, 4_000_000.0],
+            "IMPEXAC": [2500.0, -9.0, 0.0],  # exact, missing, zero -> bracket fallback
+            "INTERIN": [6, 3, 1],
+            "IMPEXACSP": [1800.0, -9.0, -9.0],  # main earner's INCOME: the old 'gasto_total' bug
+            "CAPITMENS": [400.0, np.nan, -0.1],
+            "INTERESMENS": [100.0, np.nan, 0.0],
+            "VALOREST": [200000.0, -9.0, 90000.0],
+            "CCAA": [13, 9, 19],
+            "NMIEMB": [3, 1, 2],
+            "REGTEN": [2, 1, 1],
+            "EDADSP": [45, 70, 30],
+            "SEXOSP": [1, 6, 6],
+            "ESTUDIOSSP": [7, 3, 5],
+            "SITUACTSP": [1, 3, 1],
+            "NHIJOSD": [1, 0, 0],
+            "NUMOCUP": [2, 0, 1],
+            "TIPOCONT": [1, np.nan, 2],
+        }
+    )
 
 
 def test_epf_sentinels_become_nan(epf_hogar, mapping, harm):
@@ -137,10 +157,19 @@ def test_epf_code_harmonization(epf_hogar, mapping, harm):
 # EPA: 5-year bands, codes
 # --------------------------------------------------------------------------- #
 def test_epa_age_bands_become_midpoints_with_bounds(mapping, harm):
-    epa = pd.DataFrame({"EDAD1": [20, 65, 16, 0], "SEXO1": [1, 6, 6, 1], "CCAA": [13, 51, 52, 1],
-                        "AOI": [4, 9, 5, np.nan], "NFORMA": ["SU", "P2", "SP", None],
-                        "OCUP1": ["2", "9", "5", None], "ACT1": ["8", "0", "6", None],
-                        "DUCON1": [1, np.nan, 6, np.nan], "FACTOREL": [300.0, 200.0, 100.0, 50.0]})
+    epa = pd.DataFrame(
+        {
+            "EDAD1": [20, 65, 16, 0],
+            "SEXO1": [1, 6, 6, 1],
+            "CCAA": [13, 51, 52, 1],
+            "AOI": [4, 9, 5, np.nan],
+            "NFORMA": ["SU", "P2", "SP", None],
+            "OCUP1": ["2", "9", "5", None],
+            "ACT1": ["8", "0", "6", None],
+            "DUCON1": [1, np.nan, 6, np.nan],
+            "FACTOREL": [300.0, 200.0, 100.0, 50.0],
+        }
+    )
     out = pdp.process_epa({"personas": epa}, mapping["epa"], harm, open_band_age=75.0)
     assert out["edad"].tolist() == [22.0, 75.0, 17.5, 2.0]
     assert out["edad_min"].tolist() == [20.0, 65.0, 16.0, 0.0]
@@ -171,8 +200,10 @@ def test_combined_base_filters_age_and_normalises_weights():
 # --------------------------------------------------------------------------- #
 @pytest.fixture(scope="module")
 def processed(require_processed):
-    return {name: pd.read_parquet(ROOT_PROCESSED / f"{name}.parquet")
-            for name in ["combined_base", "epf_processed", "ecv_processed"]}
+    return {
+        name: pd.read_parquet(ROOT_PROCESSED / f"{name}.parquet")
+        for name in ["combined_base", "epf_processed", "ecv_processed"]
+    }
 
 
 def test_processed_combined_ages_are_valid(processed):

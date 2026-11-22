@@ -11,6 +11,7 @@ Library use (from the generators):
 Dry run on the processed INE base (writes only under data/synthetic/):
     python -m risksynth.engine.stage2 --n 20000 --seed 42      (or: risksynth-profiles ...)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -33,21 +34,44 @@ log = logging.getLogger(__name__)
 # run_stage2 receives random_seed + stage_2 offset (1000); stage 3 uses random_seed + 2000
 STAGE3_SEED_DELTA = 1000
 
-NUMERIC_SUMMARY = ["net_income_annual_eur", "household_expenses_annual_eur",
-                   "total_debt_service_annual_eur", "raw_surplus_eur", "investable_surplus_eur",
-                   "surplus_ratio", "debt_service_to_income", "liquid_savings_eur",
-                   "risk_tolerance_score", "investment_horizon_years", "max_acceptable_drawdown_pct",
-                   "liquidity_need_pct", "risk_capacity_points", "risk_capacity_score",
-                   "effective_risk_score"]
-CATEGORICAL_SUMMARY = ["household_finance_source", "liquid_savings_source",
-                       "risk_tolerance_category", "investment_horizon_bucket",
-                       "primary_investment_goal", "esg_preference_level", "employment_stability"]
+NUMERIC_SUMMARY = [
+    "net_income_annual_eur",
+    "household_expenses_annual_eur",
+    "total_debt_service_annual_eur",
+    "raw_surplus_eur",
+    "investable_surplus_eur",
+    "surplus_ratio",
+    "debt_service_to_income",
+    "liquid_savings_eur",
+    "risk_tolerance_score",
+    "investment_horizon_years",
+    "max_acceptable_drawdown_pct",
+    "liquidity_need_pct",
+    "risk_capacity_points",
+    "risk_capacity_score",
+    "effective_risk_score",
+]
+CATEGORICAL_SUMMARY = [
+    "household_finance_source",
+    "liquid_savings_source",
+    "risk_tolerance_category",
+    "investment_horizon_bucket",
+    "primary_investment_goal",
+    "esg_preference_level",
+    "employment_stability",
+]
 
 
-def run_stage2(df: pd.DataFrame, seed: int, cfg: dict | None = None,
-               donor_pool: pd.DataFrame | None = None, enforce: bool = True,
-               exempt: dict | None = None, edge_cases: bool | None = None,
-               edge_case_share: float | None = None) -> tuple[pd.DataFrame, dict]:
+def run_stage2(
+    df: pd.DataFrame,
+    seed: int,
+    cfg: dict | None = None,
+    donor_pool: pd.DataFrame | None = None,
+    enforce: bool = True,
+    exempt: dict | None = None,
+    edge_cases: bool | None = None,
+    edge_case_share: float | None = None,
+) -> tuple[pd.DataFrame, dict]:
     """Derive wealth features (stage 2) and the edge-case cohort (stage 3); return (profiles, report).
 
     `cr_violations_raw` keeps, per row, the rules violated by the raw draws and
@@ -76,26 +100,30 @@ def run_stage2(df: pd.DataFrame, seed: int, cfg: dict | None = None,
         df, thresholds, fill_stats = ec.build_cohort(df, cfg, rng3, edge_case_share)
         for rule, mask in ec.exemptions(df, cfg).items():
             exempt[rule] = exempt[rule] | mask if rule in exempt else mask
-        if enforce:   # anything a non-relaxed rule rejects is still repaired, cohort rows included
+        if enforce:  # anything a non-relaxed rule rejects is still repaired, cohort rows included
             df, repairs_after_ec = consistency.enforce(df, cfg, rng3, exempt)
         else:
             df = wp.compute_capacity(df, cfg)
 
-    final_masks, final_counts = consistency.validate(df, cfg, exempt,
-                                                     stage="enforced" if enforce else "raw")
-    df["profile_inconsistency_flag"] = rule_violated = (
-        consistency.rule_masks(df, cfg)[consistency.CR_IDS].any(axis=1))
+    final_masks, final_counts = consistency.validate(df, cfg, exempt, stage="enforced" if enforce else "raw")
+    df["profile_inconsistency_flag"] = rule_violated = consistency.rule_masks(df, cfg)[
+        consistency.CR_IDS
+    ].any(axis=1)
     if use_edge_cases:
         df, ec_report = ec.label_and_validate(df, cfg, thresholds, fill_stats, _acceptance_rules())
-        log.info("Edge cases: %.2f%% of rows (target %.2f%%), origins %s",
-                 ec_report["achieved_total_share_pct"], ec_report["target_total_share_pct"],
-                 ec_report["origin_counts"])
+        log.info(
+            "Edge cases: %.2f%% of rows (target %.2f%%), origins %s",
+            ec_report["achieved_total_share_pct"],
+            ec_report["target_total_share_pct"],
+            ec_report["origin_counts"],
+        )
     report = {
         "rows": len(df),
         "seed": seed,
         "enforced": enforce,
         "income_calibration_factor": wp.schema(cfg)["features"]["investable_surplus_eur"][
-            "income_calibration_factor"],
+            "income_calibration_factor"
+        ],
         "violations_raw": raw_counts,
         "repairs_applied": repairs,
         "repairs_after_edge_cases": repairs_after_ec,
@@ -124,20 +152,35 @@ def summarize(df: pd.DataFrame) -> dict:
     for col in (c for c in NUMERIC_SUMMARY if c in df):
         s = pd.to_numeric(df[col], errors="coerce")
         q = s.quantile([0.05, 0.25, 0.5, 0.75, 0.95])
-        out["numeric"][col] = {"mean": _r(s.mean()), "p05": _r(q[0.05]), "p25": _r(q[0.25]),
-                               "p50": _r(q[0.5]), "p75": _r(q[0.75]), "p95": _r(q[0.95]),
-                               "null_pct": _r(100 * s.isna().mean())}
+        out["numeric"][col] = {
+            "mean": _r(s.mean()),
+            "p05": _r(q[0.05]),
+            "p25": _r(q[0.25]),
+            "p50": _r(q[0.5]),
+            "p75": _r(q[0.75]),
+            "p95": _r(q[0.95]),
+            "null_pct": _r(100 * s.isna().mean()),
+        }
     for col in (c for c in CATEGORICAL_SUMMARY if c in df):
-        out["categorical"][col] = {str(k): _r(v) for k, v in
-                                   (100 * df[col].value_counts(normalize=True)).items()}
+        out["categorical"][col] = {
+            str(k): _r(v) for k, v in (100 * df[col].value_counts(normalize=True)).items()
+        }
     out["share_raw_surplus_negative_pct"] = _r(100 * (df["raw_surplus_eur"] < 0).mean())
     out["share_investable_zero_pct"] = _r(100 * (df["investable_surplus_eur"] == 0).mean())
     out["capacity_caps_pct"] = {
         cap: _r(100 * df["capacity_caps_applied"].fillna("").str.contains(cap).mean())
-        for cap in ["CAP_NO_SURPLUS", "CAP_HIGH_DSTI", "CAP_NO_BUFFER", "CAP_SHORT_HORIZON",
-                    "CAP_HIGH_LIQUIDITY", "CAP_NEAR_RETIREMENT"]}
+        for cap in [
+            "CAP_NO_SURPLUS",
+            "CAP_HIGH_DSTI",
+            "CAP_NO_BUFFER",
+            "CAP_SHORT_HORIZON",
+            "CAP_HIGH_LIQUIDITY",
+            "CAP_NEAR_RETIREMENT",
+        ]
+    }
     out["effective_below_tolerance_pct"] = _r(
-        100 * (df["effective_risk_score"] < df["risk_tolerance_score"]).mean())
+        100 * (df["effective_risk_score"] < df["risk_tolerance_score"]).mean()
+    )
     return out
 
 
@@ -161,17 +204,25 @@ def main() -> None:
     parser.add_argument("--out", type=Path, default=None)
     parser.add_argument("--no-enforce", action="store_true")
     parser.add_argument("--no-edge-cases", action="store_true")
-    parser.add_argument("--edge-case-share", type=float, default=None,
-                        help="override the total edge-case share (default 0.08 from config)")
+    parser.add_argument(
+        "--edge-case-share",
+        type=float,
+        default=None,
+        help="override the total edge-case share (default 0.08 from config)",
+    )
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(name)s: %(message)s")
 
     base = pd.read_parquet(args.input)
     if args.n:
         base = base.sample(n=min(args.n, len(base)), random_state=args.seed).reset_index(drop=True)
-    profiles, report = run_stage2(base, seed=args.seed, enforce=not args.no_enforce,
-                                  edge_cases=False if args.no_edge_cases else None,
-                                  edge_case_share=args.edge_case_share)
+    profiles, report = run_stage2(
+        base,
+        seed=args.seed,
+        enforce=not args.no_enforce,
+        edge_cases=False if args.no_edge_cases else None,
+        edge_case_share=args.edge_case_share,
+    )
     report["input"] = str(args.input)
     out = args.out or SYNTHETIC_DIR / f"wealth_dryrun_{datetime.now():%Y%m%d_%H%M%S}"
     paths = write_outputs(profiles, report, out, "wealth_profiles")

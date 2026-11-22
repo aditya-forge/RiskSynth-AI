@@ -10,6 +10,7 @@ risk, the CR01-CR07 and MiFID II checks, the edge-case assertion and the model p
 Nothing is repaired here. The point is to see which rules a changed profile would break,
 not to fix it.
 """
+
 from __future__ import annotations
 
 import numpy as np
@@ -45,8 +46,9 @@ def _edge_case(cfg: dict, ec_id) -> dict | None:
     return next((p for p in cfg["edge_case_profiles"]["profiles"] if p["id"] == ec_id), None)
 
 
-def reassess(row: pd.Series, changes: dict | None = None, cfg: dict | None = None,
-             params: dict | None = None) -> dict:
+def reassess(
+    row: pd.Series, changes: dict | None = None, cfg: dict | None = None, params: dict | None = None
+) -> dict:
     """Recompute the suitability picture for `row` with `changes` applied.
 
     Returns a dict with the recomputed profile (one-row frame), per-rule results, the
@@ -71,18 +73,22 @@ def reassess(row: pd.Series, changes: dict | None = None, cfg: dict | None = Non
     df = wp.derive_surplus(df, cfg)
     feat = s["features"]
     df["risk_tolerance_score"] = df["risk_tolerance_score"].astype(int)
-    df["risk_tolerance_category"] = wp.category_from_score(df["risk_tolerance_score"],
-                                                           feat["risk_tolerance_score"]["categories"])
+    df["risk_tolerance_category"] = wp.category_from_score(
+        df["risk_tolerance_score"], feat["risk_tolerance_score"]["categories"]
+    )
     horizon = feat["investment_horizon_years"]
-    df[horizon["bucket_column"]] = wp.bucket_from_years(df["investment_horizon_years"].astype(float),
-                                                        horizon["buckets"])
+    df[horizon["bucket_column"]] = wp.bucket_from_years(
+        df["investment_horizon_years"].astype(float), horizon["buckets"]
+    )
     df = wp.compute_capacity(df, cfg)
 
     ec = _edge_case(cfg, row.get("edge_case_id"))
     relaxed = set(ec["relaxed_rules"]) if ec else set()
     masks = consistency.rule_masks(df, cfg).iloc[0]
-    rules = [{"rule": rid, "text": r["rule"], "violated": bool(masks[rid]), "exempt": rid in relaxed}
-             for rid, r in ((r["id"], r) for r in s["consistency_rules"])]
+    rules = [
+        {"rule": rid, "text": r["rule"], "violated": bool(masks[rid]), "exempt": rid in relaxed}
+        for rid, r in ((r["id"], r) for r in s["consistency_rules"])
+    ]
     mifid = [{"rule": rid, "text": text, "violated": bool(masks[rid])} for rid, text in MIFID_CHECKS.items()]
     df["profile_inconsistency_flag"] = bool(masks[consistency.CR_IDS].any())
 
@@ -94,9 +100,12 @@ def reassess(row: pd.Series, changes: dict | None = None, cfg: dict | None = Non
     assertion = None
     if ec:
         test = ec["expected_advisory_outcome"]["test_assertion"]
-        assertion = {"id": ec["id"], "test": test,
-                     "expected": ec["expected_advisory_outcome"]["recommendation"],
-                     "holds": bool(wp.evaluate(df, test).iloc[0])}
+        assertion = {
+            "id": ec["id"],
+            "test": test,
+            "expected": ec["expected_advisory_outcome"]["recommendation"],
+            "holds": bool(wp.evaluate(df, test).iloc[0]),
+        }
 
     blocking = [r["rule"] for r in rules + mifid if r["violated"] and not r.get("exempt")]
     if blocking or df["profile_inconsistency_flag"].iloc[0]:

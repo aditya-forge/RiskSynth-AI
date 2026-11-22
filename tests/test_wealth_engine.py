@@ -1,5 +1,6 @@
 # Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Wealth feature engine, MiFID II risk capacity and consistency rules CR01-CR07."""
+
 from __future__ import annotations
 
 import copy
@@ -38,8 +39,14 @@ def test_negative_surplus_share_matches_epf(profiles):
 
 
 def test_surplus_formula_and_income_calibration_factor(data_cfg):
-    df = pd.DataFrame({"net_income_annual_eur": [30000.0, 20000.0], "household_expenses_annual_eur": [25000.0, 21000.0],
-                       "debt_service_annual_eur": [3000.0, 0.0], "consumer_debt_service_annual_eur": [1200.0, np.nan]})
+    df = pd.DataFrame(
+        {
+            "net_income_annual_eur": [30000.0, 20000.0],
+            "household_expenses_annual_eur": [25000.0, 21000.0],
+            "debt_service_annual_eur": [3000.0, 0.0],
+            "consumer_debt_service_annual_eur": [1200.0, np.nan],
+        }
+    )
     out = wp.derive_surplus(df.copy(), data_cfg)
     assert out["raw_surplus_eur"].tolist() == [800.0, -1000.0]
     assert out["investable_surplus_eur"].tolist() == [800.0, 0.0]
@@ -63,7 +70,14 @@ def test_hy020_is_never_fabricated(profiles):
 def test_horizon_bucket_boundaries(data_cfg):
     buckets = data_cfg["wealth_profile_schema"]["features"]["investment_horizon_years"]["buckets"]
     years = pd.Series([0.5, 2.9, 3.0, 6.9, 7.0, 30.0])
-    assert wp.bucket_from_years(years, buckets).tolist() == ["Short", "Short", "Medium", "Medium", "Long", "Long"]
+    assert wp.bucket_from_years(years, buckets).tolist() == [
+        "Short",
+        "Short",
+        "Medium",
+        "Medium",
+        "Long",
+        "Long",
+    ]
 
 
 def test_score_category_cutoffs(data_cfg):
@@ -77,10 +91,13 @@ def test_age_bands_are_contiguous():
     assert out.tolist() == ["18-34", "18-34", "18-34", "35-49", "50-64", "65+", "65+"]
 
 
-@pytest.mark.parametrize("column, path", [
-    ("risk_tolerance_category", "risk_tolerance_score"),
-    ("esg_preference_level", "esg_preference_level"),
-])
+@pytest.mark.parametrize(
+    "column, path",
+    [
+        ("risk_tolerance_category", "risk_tolerance_score"),
+        ("esg_preference_level", "esg_preference_level"),
+    ],
+)
 def test_target_distributions_are_exact(profiles, data_cfg, column, path):
     target = data_cfg["wealth_profile_schema"]["features"][path]["generation"]["target_distribution"]
     actual = profiles[column].astype("string").value_counts(normalize=True)
@@ -93,7 +110,11 @@ def test_feature_ranges(profiles):
     assert profiles["max_acceptable_drawdown_pct"].between(5, 40).all()
     assert profiles["liquidity_need_pct"].between(0, 100).all()
     assert profiles["investment_horizon_years"].between(0.5, 50).all()
-    assert profiles["primary_investment_goal"].isin(["Capital Preservation", "Retirement", "Wealth Growth", "Income"]).all()
+    assert (
+        profiles["primary_investment_goal"]
+        .isin(["Capital Preservation", "Retirement", "Wealth Growth", "Income"])
+        .all()
+    )
 
 
 def test_expected_dependencies(profiles, model_cfg):
@@ -107,8 +128,10 @@ def test_expected_dependencies(profiles, model_cfg):
 # Risk capacity (MiFID II) and named caps
 # --------------------------------------------------------------------------- #
 def test_effective_risk_is_min_of_tolerance_and_capacity(profiles):
-    assert (profiles["effective_risk_score"]
-            == np.minimum(profiles["risk_tolerance_score"], profiles["risk_capacity_score"])).all()
+    assert (
+        profiles["effective_risk_score"]
+        == np.minimum(profiles["risk_tolerance_score"], profiles["risk_capacity_score"])
+    ).all()
     assert profiles["risk_capacity_score"].between(1, 10).all()
 
 
@@ -123,8 +146,17 @@ def test_every_named_capacity_cap_binds(profiles, data_cfg):
 
 def test_capacity_points_scheme(data_cfg):
     cap_cfg = data_cfg["wealth_profile_schema"]["supporting_features"]["risk_capacity_score"]
-    assert wp.points(pd.Series([-0.1, 0.05, 0.2, 0.5]), cap_cfg["points"]["surplus_ratio"]).tolist() == [0, 1, 2, 3]
-    assert wp.points(pd.Series([0.4, 0.25, 0.1]), cap_cfg["points"]["debt_service_to_income"]).tolist() == [0, 1, 2]
+    assert wp.points(pd.Series([-0.1, 0.05, 0.2, 0.5]), cap_cfg["points"]["surplus_ratio"]).tolist() == [
+        0,
+        1,
+        2,
+        3,
+    ]
+    assert wp.points(pd.Series([0.4, 0.25, 0.1]), cap_cfg["points"]["debt_service_to_income"]).tolist() == [
+        0,
+        1,
+        2,
+    ]
 
 
 # --------------------------------------------------------------------------- #
@@ -147,8 +179,14 @@ def test_raw_draws_and_repairs_are_auditable(report, profiles):
 def test_enforce_repairs_every_rule_on_shuffled_columns(profiles, data_cfg):
     rng = np.random.default_rng(3)
     noisy = profiles.sample(4000, random_state=3).reset_index(drop=True)
-    for col in ["risk_tolerance_category", "investment_horizon_bucket", "primary_investment_goal",
-                "investment_horizon_years", "max_acceptable_drawdown_pct", "investable_surplus_eur"]:
+    for col in [
+        "risk_tolerance_category",
+        "investment_horizon_bucket",
+        "primary_investment_goal",
+        "investment_horizon_years",
+        "max_acceptable_drawdown_pct",
+        "investable_surplus_eur",
+    ]:
         noisy[col] = rng.permutation(noisy[col].to_numpy())
     before = consistency.rule_masks(noisy, data_cfg)
     for rule in ["CR01", "CR02", "CR03", "CR04", "CR06", "CR07"]:

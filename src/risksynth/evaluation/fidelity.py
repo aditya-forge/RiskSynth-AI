@@ -14,6 +14,7 @@ Reference data: the INE inputs the generator learned from.
 Thresholds come from model_config.yaml (evaluation_config.thresholds, statistical_constraints,
 dependency_constraints). Nothing here needs SDV, loguru or seaborn.
 """
+
 from __future__ import annotations
 
 import html
@@ -30,13 +31,27 @@ from risksynth.engine import consistency, edge_cases
 from risksynth.engine import wealth_profile as wp
 from risksynth.paths import MODEL_CONFIG, PROCESSED_DIR, REPORTS_DIR
 
-FINANCE_COLUMNS = ["net_income_annual_eur", "household_expenses_annual_eur", "debt_service_annual_eur",
-                   "household_surplus_eur", "main_residence_value_eur"]
+FINANCE_COLUMNS = [
+    "net_income_annual_eur",
+    "household_expenses_annual_eur",
+    "debt_service_annual_eur",
+    "household_surplus_eur",
+    "main_residence_value_eur",
+]
 DEMOGRAPHIC_NUMERIC = ["edad", "n_miembros", "dependent_children"]
 CATEGORICAL = ["nivel_estudios", "situacion_laboral", "sexo"]
-WEALTH_FEATURES = ["edad", "net_income_annual_eur", "raw_surplus_eur", "liquid_savings_eur",
-                   "risk_tolerance_score", "investment_horizon_years", "max_acceptable_drawdown_pct",
-                   "liquidity_need_pct", "risk_capacity_score", "effective_risk_score"]
+WEALTH_FEATURES = [
+    "edad",
+    "net_income_annual_eur",
+    "raw_surplus_eur",
+    "liquid_savings_eur",
+    "risk_tolerance_score",
+    "investment_horizon_years",
+    "max_acceptable_drawdown_pct",
+    "liquidity_need_pct",
+    "risk_capacity_score",
+    "effective_risk_score",
+]
 
 
 def load_model_config() -> dict:
@@ -50,8 +65,11 @@ def _with_surplus(df: pd.DataFrame) -> pd.DataFrame:
     if "household_expenses_annual_eur" not in df and "gasto_monetario" in df:
         df["household_expenses_annual_eur"] = df["gasto_monetario"]
     if {"net_income_annual_eur", "household_expenses_annual_eur"} <= set(df):
-        df["household_surplus_eur"] = (df["net_income_annual_eur"] - df["household_expenses_annual_eur"]
-                                       - df.get("debt_service_annual_eur", 0).fillna(0))
+        df["household_surplus_eur"] = (
+            df["net_income_annual_eur"]
+            - df["household_expenses_annual_eur"]
+            - df.get("debt_service_annual_eur", 0).fillna(0)
+        )
     return df
 
 
@@ -94,19 +112,31 @@ def numeric_tests(ref: pd.DataFrame, syn: pd.DataFrame, columns: list, thr: dict
     for col in columns:
         if col not in ref or col not in syn:
             continue
-        r, s = pd.to_numeric(ref[col], errors="coerce").dropna(), pd.to_numeric(syn[col], errors="coerce").dropna()
+        r, s = (
+            pd.to_numeric(ref[col], errors="coerce").dropna(),
+            pd.to_numeric(syn[col], errors="coerce").dropna(),
+        )
         if len(r) < 20 or len(s) < 20:
             continue
         ks = stats.ks_2samp(r, s)
-        span = r.quantile(0.99) - r.quantile(0.01)   # robust range: one outlier must not hide gaps
+        span = r.quantile(0.99) - r.quantile(0.01)  # robust range: one outlier must not hide gaps
         wd = stats.wasserstein_distance(r, s)
         norm = wd / span if span > 0 else 0.0
         grade = _grade(norm, thr["numerical"]["wasserstein_normalized"])
         passed = ks.statistic <= thr["numerical"]["ks_statistic_max"] and grade != "Poor"
-        rows.append({"column": col, "n_reference": len(r), "n_synthetic": len(s),
-                     "ks_d": round(ks.statistic, 4), "ks_p_value": float(ks.pvalue),
-                     "wasserstein": round(wd, 2), "wasserstein_norm": round(norm, 4),
-                     "grade": grade, "status": "PASS" if passed else "FAIL"})
+        rows.append(
+            {
+                "column": col,
+                "n_reference": len(r),
+                "n_synthetic": len(s),
+                "ks_d": round(ks.statistic, 4),
+                "ks_p_value": float(ks.pvalue),
+                "wasserstein": round(wd, 2),
+                "wasserstein_norm": round(norm, 4),
+                "grade": grade,
+                "status": "PASS" if passed else "FAIL",
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -121,10 +151,19 @@ def categorical_tests(ref: pd.DataFrame, syn: pd.DataFrame, columns: list, thr: 
         p, q = p.reindex(cats, fill_value=0), q.reindex(cats, fill_value=0)
         jsd = float(jensenshannon(p, q, base=2) ** 2)
         max_pp = float((100 * (p - q).abs()).max())
-        passed = (jsd <= thr["categorical"]["jensen_shannon_max"]
-                  and max_pp <= thr["categorical"]["category_share_tolerance_pp"])
-        rows.append({"column": col, "categories": len(cats), "jensen_shannon": round(jsd, 4),
-                     "max_share_diff_pp": round(max_pp, 2), "status": "PASS" if passed else "FAIL"})
+        passed = (
+            jsd <= thr["categorical"]["jensen_shannon_max"]
+            and max_pp <= thr["categorical"]["category_share_tolerance_pp"]
+        )
+        rows.append(
+            {
+                "column": col,
+                "categories": len(cats),
+                "jensen_shannon": round(jsd, 4),
+                "max_share_diff_pp": round(max_pp, 2),
+                "status": "PASS" if passed else "FAIL",
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -137,26 +176,45 @@ def target_mix_tests(syn: pd.DataFrame, model_cfg: dict) -> pd.DataFrame:
         actual = 100 * syn[c["column"]].astype("string").value_counts(normalize=True)
         for cat, share in c["params"].items():
             diff = actual.get(str(cat), 0.0) - 100 * share
-            rows.append({"column": c["column"], "category": str(cat), "target_pct": round(100 * share, 2),
-                         "actual_pct": round(float(actual.get(str(cat), 0.0)), 2), "diff_pp": round(float(diff), 2),
-                         "status": "PASS" if abs(diff) <= c["tolerance_pp"] else "FAIL"})
+            rows.append(
+                {
+                    "column": c["column"],
+                    "category": str(cat),
+                    "target_pct": round(100 * share, 2),
+                    "actual_pct": round(float(actual.get(str(cat), 0.0)), 2),
+                    "diff_pp": round(float(diff), 2),
+                    "status": "PASS" if abs(diff) <= c["tolerance_pp"] else "FAIL",
+                }
+            )
     return pd.DataFrame(rows)
 
 
 def correlation_tests(ref: pd.DataFrame, syn: pd.DataFrame, columns: list, thr: dict) -> dict:
-    cols = [c for c in columns if c in ref and c in syn
-            and pd.to_numeric(ref[c], errors="coerce").notna().sum() > 20]
+    cols = [
+        c
+        for c in columns
+        if c in ref and c in syn and pd.to_numeric(ref[c], errors="coerce").notna().sum() > 20
+    ]
     r = ref[cols].apply(pd.to_numeric, errors="coerce").corr(method="spearman")
     s = syn[cols].apply(pd.to_numeric, errors="coerce").corr(method="spearman")
-    diff = (s - r)
+    diff = s - r
     off = ~np.eye(len(cols), dtype=bool)
     mean_abs = float(diff.abs().to_numpy()[off].mean()) if len(cols) > 1 else 0.0
     max_abs = float(diff.abs().to_numpy()[off].max()) if len(cols) > 1 else 0.0
     t = thr["correlation"]
-    return {"columns": cols, "reference": r, "synthetic": s, "difference": diff,
-            "mean_abs_diff": round(mean_abs, 4), "max_abs_diff": round(max_abs, 4),
-            "status": "PASS" if mean_abs <= t["mean_abs_spearman_diff_max"]
-            and max_abs <= t["max_abs_spearman_diff_max"] else "FAIL"}
+    return {
+        "columns": cols,
+        "reference": r,
+        "synthetic": s,
+        "difference": diff,
+        "mean_abs_diff": round(mean_abs, 4),
+        "max_abs_diff": round(max_abs, 4),
+        "status": (
+            "PASS"
+            if mean_abs <= t["mean_abs_spearman_diff_max"] and max_abs <= t["max_abs_spearman_diff_max"]
+            else "FAIL"
+        ),
+    }
 
 
 def dependency_tests(syn: pd.DataFrame, model_cfg: dict) -> pd.DataFrame:
@@ -168,8 +226,15 @@ def dependency_tests(syn: pd.DataFrame, model_cfg: dict) -> pd.DataFrame:
         rho = float(syn[a].corr(syn[b], method="spearman"))
         ok = rho >= c.get("min_rho", -1) and rho <= c.get("max_rho", 1)
         bounds = " ".join(f"{k}={v}" for k, v in c.items() if "rho" in k)
-        rows.append({"pair": f"{a} ~ {b}", "expected": c["expected"], "bounds": bounds,
-                     "spearman_rho": round(rho, 3), "status": "PASS" if ok else "FAIL"})
+        rows.append(
+            {
+                "pair": f"{a} ~ {b}",
+                "expected": c["expected"],
+                "bounds": bounds,
+                "spearman_rho": round(rho, 3),
+                "status": "PASS" if ok else "FAIL",
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -178,31 +243,48 @@ def compliance_tests(df: pd.DataFrame, data_cfg: dict) -> pd.DataFrame:
     masks = consistency.rule_masks(df, data_cfg)
     exempt = edge_cases.exemptions(df, data_cfg) if "edge_case_id" in df else {}
     rules = {r["id"]: r["rule"] for r in data_cfg["wealth_profile_schema"]["consistency_rules"]}
-    rules.update({"MIFID_EFFECTIVE_RISK": "effective_risk_score == min(tolerance, capacity)",
-                  "MIFID_CAPACITY_CURRENT": "risk_capacity_score matches a fresh recomputation",
-                  "MIFID_ESG_COLLECTED": "sustainability preference collected"})
+    rules.update(
+        {
+            "MIFID_EFFECTIVE_RISK": "effective_risk_score == min(tolerance, capacity)",
+            "MIFID_CAPACITY_CURRENT": "risk_capacity_score matches a fresh recomputation",
+            "MIFID_ESG_COLLECTED": "sustainability preference collected",
+        }
+    )
     rows = []
     for rule in masks.columns:
         ex = exempt.get(rule, pd.Series(False, index=df.index))
         violated = int(masks[rule].sum())
         exempted = int((masks[rule] & ex).sum())
         unexpected = violated - exempted
-        rows.append({"rule": rule, "definition": rules.get(rule, ""), "violations": violated,
-                     "exempted": exempted, "unexpected": unexpected,
-                     "status": "PASS" if unexpected == 0 else "FAIL"})
+        rows.append(
+            {
+                "rule": rule,
+                "definition": rules.get(rule, ""),
+                "violations": violated,
+                "exempted": exempted,
+                "unexpected": unexpected,
+                "status": "PASS" if unexpected == 0 else "FAIL",
+            }
+        )
     return pd.DataFrame(rows)
 
 
-def run_all(df: pd.DataFrame, data_cfg: dict | None = None, model_cfg: dict | None = None,
-            kind: str | None = None) -> dict:
+def run_all(
+    df: pd.DataFrame, data_cfg: dict | None = None, model_cfg: dict | None = None, kind: str | None = None
+) -> dict:
     data_cfg = data_cfg or wp.load_config()
     model_cfg = model_cfg or load_model_config()
     thr = model_cfg["evaluation_config"]["thresholds"]
     kind = kind or reference_kind(df)
     fin_ref, demo_ref = reference_tables(kind)
     base = _with_surplus(base_population(df))
-    numeric = pd.concat([numeric_tests(fin_ref, base, FINANCE_COLUMNS, thr),
-                         numeric_tests(demo_ref, base, DEMOGRAPHIC_NUMERIC, thr)], ignore_index=True)
+    numeric = pd.concat(
+        [
+            numeric_tests(fin_ref, base, FINANCE_COLUMNS, thr),
+            numeric_tests(demo_ref, base, DEMOGRAPHIC_NUMERIC, thr),
+        ],
+        ignore_index=True,
+    )
     corr_cols = [c for c in FINANCE_COLUMNS + ["edad", "n_miembros"] if c in base]
     return {
         "generated_at": datetime.now().isoformat(timespec="seconds"),
@@ -214,8 +296,9 @@ def run_all(df: pd.DataFrame, data_cfg: dict | None = None, model_cfg: dict | No
         "categorical": categorical_tests(demo_ref, base, CATEGORICAL, thr),
         "target_mix": target_mix_tests(base, model_cfg),
         "correlation": correlation_tests(fin_ref, base, corr_cols, thr),
-        "wealth_correlation": base[[c for c in WEALTH_FEATURES if c in base]].apply(
-            pd.to_numeric, errors="coerce").corr(method="spearman"),
+        "wealth_correlation": base[[c for c in WEALTH_FEATURES if c in base]]
+        .apply(pd.to_numeric, errors="coerce")
+        .corr(method="spearman"),
         "dependencies": dependency_tests(base, model_cfg),
         "compliance": compliance_tests(df, data_cfg),
     }
@@ -240,22 +323,26 @@ def _cell(value) -> tuple[str, str]:
     return text, ""
 
 
-def _table(df: pd.DataFrame) -> str:
+def _table(df: pd.DataFrame, indent: int = 3) -> list[str]:
+    """One indented line per row and cell, so the saved report reads like hand-written HTML."""
+    pad = "  " * indent
     if df is None or len(df) == 0:
-        return "<p class='muted'>No data.</p>"
-    head = []
+        return [f'{pad}<p class="muted">No data.</p>']
+    lines = [f'{pad}<div class="tbl">', f"{pad}  <table>", f"{pad}    <thead>", f"{pad}      <tr>"]
     for c in df.columns:
         numeric = pd.api.types.is_numeric_dtype(df[c]) and not pd.api.types.is_bool_dtype(df[c])
-        head.append(f"<th class='{'num' if numeric else ''}'>{html.escape(str(c).replace('_', ' '))}</th>")
-    rows = []
+        cls = ' class="num"' if numeric else ""
+        lines.append(f"{pad}        <th{cls}>{html.escape(str(c).replace('_', ' '))}</th>")
+    lines += [f"{pad}      </tr>", f"{pad}    </thead>", f"{pad}    <tbody>"]
     for _, row in df.iterrows():
-        cells = []
+        lines.append(f"{pad}      <tr>")
         for c in df.columns:
             text, cls = _cell(row[c])
-            cells.append(f"<td class='{cls}'>{html.escape(text)}</td>")
-        rows.append("<tr>" + "".join(cells) + "</tr>")
-    return (f"<div class='tbl'><table><thead><tr>{''.join(head)}</tr></thead>"
-            f"<tbody>{''.join(rows)}</tbody></table></div>")
+            attr = f' class="{cls}"' if cls else ""
+            lines.append(f"{pad}        <td{attr}>{html.escape(text)}</td>")
+        lines.append(f"{pad}      </tr>")
+    lines += [f"{pad}    </tbody>", f"{pad}  </table>", f"{pad}</div>"]
+    return lines
 
 
 def _passed(frame: pd.DataFrame) -> str:
@@ -263,81 +350,304 @@ def _passed(frame: pd.DataFrame) -> str:
 
 
 REPORT_CSS = """
-:root { --bg:#ffffff; --panel:#f6f8fa; --ink:#1f2328; --ink2:#57606a; --line:#d8dee4; --rule:#d0d7de;
-        --accent:#1e88e5; --good:#1a7f37; --bad:#cf222e; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg:#050608; --panel:#0d1016; --ink:#d4dbe5; --ink2:#8b95a5; --line:#1a1f29; --rule:#232936;
-          --accent:#58a6ff; --good:#3fb950; --bad:#f85149; }
+:root {
+  --bg: #ffffff;
+  --panel: #f6f8fa;
+  --ink: #1f2328;
+  --ink2: #57606a;
+  --line: #d8dee4;
+  --rule: #d0d7de;
+  --accent: #1e88e5;
+  --good: #1a7f37;
+  --bad: #cf222e;
 }
-* { box-sizing:border-box; }
-body { margin:0; background:var(--bg); color:var(--ink); font:14px/1.55 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
-main { max-width:1120px; margin:0 auto; padding:40px 24px 56px; }
-.eyebrow { font-size:11.5px; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--accent); }
-h1 { font-size:26px; font-weight:600; letter-spacing:-.01em; margin:8px 0 6px; }
-h2 { font-size:15px; font-weight:600; margin:36px 0 4px; }
-.sub, .muted { color:var(--ink2); }
-.sub { font-size:13px; margin:0 0 12px; }
-.meta { color:var(--ink2); font-size:13px; margin:0 0 24px; }
-.summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); border:1px solid var(--rule);
-           border-radius:2px; overflow:hidden; gap:1px; background:var(--line); }
-.summary div { background:var(--panel); padding:14px 16px; }
-.summary .l { font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color:var(--ink2); }
-.summary .v { font:500 22px/1.3 ui-monospace, "JetBrains Mono", Consolas, monospace; margin-top:4px; }
-.tbl { border:1px solid var(--rule); border-radius:2px; overflow-x:auto; }
-table { width:100%; border-collapse:collapse; font-size:13px; }
-th { text-align:left; font-weight:600; font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:var(--ink2);
-     background:var(--panel); padding:9px 12px; border-bottom:1px solid var(--rule); white-space:nowrap; }
-td { padding:8px 12px; border-bottom:1px solid var(--line); vertical-align:top; }
-tbody tr:last-child td { border-bottom:none; }
-.num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
-td.pass, td.fail { font-weight:600; font-size:12px; letter-spacing:.04em; }
-td.pass { color:var(--good); } td.fail { color:var(--bad); }
-.note { border-left:2px solid var(--rule); padding:2px 0 2px 12px; color:var(--ink2); font-size:13px; margin:28px 0 0; }
-footer { margin-top:36px; padding-top:14px; border-top:1px solid var(--line); color:var(--ink2); font-size:12px; }
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #050608;
+    --panel: #0d1016;
+    --ink: #d4dbe5;
+    --ink2: #8b95a5;
+    --line: #1a1f29;
+    --rule: #232936;
+    --accent: #58a6ff;
+    --good: #3fb950;
+    --bad: #f85149;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 14px/1.55 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+main {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 40px 24px 56px;
+}
+
+.eyebrow {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+h1 {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin: 8px 0 6px;
+}
+
+h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 36px 0 4px;
+}
+
+.sub,
+.muted,
+.meta {
+  color: var(--ink2);
+}
+
+.sub {
+  font-size: 13px;
+  margin: 0 0 12px;
+}
+
+.meta {
+  font-size: 13px;
+  margin: 0 0 24px;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.summary > div {
+  background: var(--panel);
+  padding: 14px 16px;
+}
+
+.summary .l {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink2);
+}
+
+.summary .v {
+  margin-top: 4px;
+  font: 500 22px/1.3 ui-monospace, "JetBrains Mono", Consolas, monospace;
+}
+
+.tbl {
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+th {
+  padding: 9px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink2);
+  background: var(--panel);
+  border-bottom: 1px solid var(--rule);
+}
+
+td {
+  padding: 8px 12px;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+td.pass,
+td.fail {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+td.pass {
+  color: var(--good);
+}
+
+td.fail {
+  color: var(--bad);
+}
+
+.note {
+  margin: 28px 0 0;
+  padding: 2px 0 2px 12px;
+  font-size: 13px;
+  color: var(--ink2);
+  border-left: 2px solid var(--rule);
+}
+
+footer {
+  margin-top: 36px;
+  padding-top: 14px;
+  font-size: 12px;
+  color: var(--ink2);
+  border-top: 1px solid var(--line);
+}
 """
 
 
 def html_report(results: dict, dataset_name: str) -> str:
+    """Self-contained HTML report: indented markup, one element per line, styles in the head."""
     corr = results["correlation"]
     corr_tbl = corr["difference"].round(3).reset_index().rename(columns={"index": "column"})
     comp = results["compliance"]
-    summary = [("Numeric tests", _passed(results["numeric"])), ("Categorical tests", _passed(results["categorical"])),
-               ("Target mixes", _passed(results["target_mix"])), ("Correlation drift", f"{corr['mean_abs_diff']:.3f}"),
-               ("Unexpected violations", f"{int(comp['unexpected'].sum()):,}"),
-               ("Intentional exemptions", f"{int(comp['exempted'].sum()):,}")]
-    sections = [
-        ("Numeric fidelity", "Kolmogorov-Smirnov D and Wasserstein distance per column, against INE.", results["numeric"]),
-        ("Categorical fidelity", "Jensen-Shannon divergence and the largest share difference per column.",
-         results["categorical"]),
-        ("Target mixes", "Risk tier and ESG preference shares against the configured targets.", results["target_mix"]),
-        ("Correlation difference", f"Spearman rho, synthetic minus INE. Mean |diff| {corr['mean_abs_diff']}, "
-                                   f"max {corr['max_abs_diff']}: {corr['status']}.", corr_tbl),
-        ("Expected dependencies", "Sign and size of the relationships the profile engine is designed to produce.",
-         results["dependencies"]),
-        ("Consistency rules and MiFID II checks", "CR01-CR07 and the MiFID II checks on all rows. Exempted rows are "
-                                                  "intentional edge-case traits (EC08).", comp),
+    summary = [
+        ("Numeric tests", _passed(results["numeric"])),
+        ("Categorical tests", _passed(results["categorical"])),
+        ("Target mixes", _passed(results["target_mix"])),
+        ("Correlation drift", f"{corr['mean_abs_diff']:.3f}"),
+        ("Unexpected violations", f"{int(comp['unexpected'].sum()):,}"),
+        ("Intentional exemptions", f"{int(comp['exempted'].sum()):,}"),
     ]
-    reference = ("INE persons base (ECV, EPF, EPA) for demographics and EPF households for finances"
-                 if results["reference_kind"] == "persons" else "INE EPF households")
-    cards = "".join(f"<div><div class='l'>{html.escape(l)}</div><div class='v'>{html.escape(v)}</div></div>"
-                    for l, v in summary)
-    blocks = "".join(f"<h2>{html.escape(t)}</h2><p class='sub'>{html.escape(d)}</p>{_table(f)}" for t, d, f in sections)
-    return f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark">
-<title>RiskSynth AI evaluation report</title><style>{REPORT_CSS}</style></head><body><main>
-<div class="eyebrow">RiskSynth AI &middot; Evaluation report</div>
-<h1>{html.escape(dataset_name)}</h1>
-<p class="meta">Generated {results['generated_at']} &middot; reference: {reference}<br>
-{results['rows_total']:,} rows; fidelity tests on {results['rows_base_population']:,} base-population rows
-({results['rows_injected_excluded']:,} injected edge cases excluded); rule checks on all rows.</p>
-<div class="summary">{cards}</div>
-{blocks}
-<p class="note">Parameters marked [ASSUMPTION] in the configs (risk-tier mix, ESG mix, goals by age, tolerance model,
-liquidity priors, simulator portfolios) are design choices, not measurements. Calibrate them against the
-Banco de Espa&ntilde;a EFF 2022 survey before any production use.</p>
-<footer>Synthetic data only. Not calibrated to any real client book; not investment advice.<br>
-Generated with RiskSynth AI. &copy; 2026 aditya-forge. All rights reserved; not licensed for reuse.</footer>
-</main></body></html>"""
+    sections = [
+        (
+            "Numeric fidelity",
+            "Kolmogorov-Smirnov D and Wasserstein distance per column, against INE.",
+            results["numeric"],
+        ),
+        (
+            "Categorical fidelity",
+            "Jensen-Shannon divergence and the largest share difference per column.",
+            results["categorical"],
+        ),
+        (
+            "Target mixes",
+            "Risk tier and ESG preference shares against the configured targets.",
+            results["target_mix"],
+        ),
+        (
+            "Correlation difference",
+            f"Spearman rho, synthetic minus INE. Mean |diff| {corr['mean_abs_diff']}, "
+            f"max {corr['max_abs_diff']}: {corr['status']}.",
+            corr_tbl,
+        ),
+        (
+            "Expected dependencies",
+            "Sign and size of the relationships the profile engine is designed to produce.",
+            results["dependencies"],
+        ),
+        (
+            "Consistency rules and MiFID II checks",
+            "CR01-CR07 and the MiFID II checks on all rows. Exempted rows are intentional edge-case traits "
+            "(EC08).",
+            comp,
+        ),
+    ]
+    reference = (
+        "INE persons base (ECV, EPF, EPA) for demographics and EPF households for finances"
+        if results["reference_kind"] == "persons"
+        else "INE EPF households"
+    )
+
+    css = "\n".join(f"      {line}" if line else "" for line in REPORT_CSS.strip("\n").splitlines())
+    out = [
+        "<!DOCTYPE html>",
+        '<html lang="en">',
+        "  <head>",
+        '    <meta charset="utf-8">',
+        '    <meta name="viewport" content="width=device-width, initial-scale=1">',
+        '    <meta name="color-scheme" content="light dark">',
+        "    <title>RiskSynth AI evaluation report</title>",
+        "    <style>",
+        css,
+        "    </style>",
+        "  </head>",
+        "  <body>",
+        "    <main>",
+        '      <div class="eyebrow">RiskSynth AI &middot; Evaluation report</div>',
+        f"      <h1>{html.escape(dataset_name)}</h1>",
+        '      <p class="meta">',
+        f"        Generated {results['generated_at']} &middot; reference: {reference}<br>",
+        f"        {results['rows_total']:,} rows; fidelity tests on {results['rows_base_population']:,} "
+        f"base-population rows ({results['rows_injected_excluded']:,} injected edge cases excluded); "
+        "rule checks on all rows.",
+        "      </p>",
+        "",
+        '      <div class="summary">',
+    ]
+    for label, value in summary:
+        out += [
+            "        <div>",
+            f'          <div class="l">{html.escape(label)}</div>',
+            f'          <div class="v">{html.escape(value)}</div>',
+            "        </div>",
+        ]
+    out.append("      </div>")
+    for title, description, frame in sections:
+        out += [
+            "",
+            "      <section>",
+            f"        <h2>{html.escape(title)}</h2>",
+            f'        <p class="sub">{html.escape(description)}</p>',
+            *_table(frame, indent=4),
+            "      </section>",
+        ]
+    out += [
+        "",
+        '      <p class="note">',
+        "        Parameters marked [ASSUMPTION] in the configs (risk-tier mix, ESG mix,",
+        "        goals by age, tolerance model, liquidity priors, simulator portfolios) are",
+        "        design choices, not measurements. Calibrate them against the",
+        "        Banco de Espa&ntilde;a EFF 2022 survey before any production use.",
+        "      </p>",
+        "",
+        "      <footer>",
+        "        Synthetic data only. Not calibrated to any real client book; not investment advice.<br>",
+        "        Generated with RiskSynth AI. &copy; 2026 aditya-forge.",
+        "        All rights reserved; not licensed for reuse.",
+        "      </footer>",
+        "    </main>",
+        "  </body>",
+        "</html>",
+        "",
+    ]
+    return "\n".join(out)
 
 
 def save_report(results: dict, dataset_name: str, out_dir: Path | None = None) -> Path:

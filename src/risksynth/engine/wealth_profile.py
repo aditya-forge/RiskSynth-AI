@@ -13,6 +13,7 @@ Pipeline order (each step only uses what precedes it):
 
 Consistency rules and MiFID II checks live in consistency.py; stage2.py orchestrates.
 """
+
 from __future__ import annotations
 
 import logging
@@ -26,14 +27,20 @@ from risksynth.paths import DATA_CONFIG, PROCESSED_DIR
 
 log = logging.getLogger(__name__)
 
-HOUSEHOLD_COLUMNS_FROM_EPF = {        # engine name <- epf_processed column
-    "edad": "edad", "sexo": "sexo", "ccaa": "ccaa", "nivel_estudios": "nivel_estudios",
-    "situacion_laboral": "situacion_laboral", "contract_type": "contract_type",
-    "n_miembros": "n_miembros", "dependent_children": "dependent_children",
+HOUSEHOLD_COLUMNS_FROM_EPF = {  # engine name <- epf_processed column
+    "edad": "edad",
+    "sexo": "sexo",
+    "ccaa": "ccaa",
+    "nivel_estudios": "nivel_estudios",
+    "situacion_laboral": "situacion_laboral",
+    "contract_type": "contract_type",
+    "n_miembros": "n_miembros",
+    "dependent_children": "dependent_children",
     "net_income_annual_eur": "net_income_annual_eur",
     "household_expenses_annual_eur": "gasto_monetario",
     "debt_service_annual_eur": "debt_service_annual_eur",
-    "main_residence_value_eur": "main_residence_value_eur", "peso": "peso",
+    "main_residence_value_eur": "main_residence_value_eur",
+    "peso": "peso",
 }
 
 
@@ -60,9 +67,10 @@ def interval_mask(values: pd.Series, spec: str) -> pd.Series:
     spec = spec.strip()
     for op in ("<=", ">=", "<", ">"):
         if spec.startswith(op):
-            bound = float(spec[len(op):])
-            return {"<=": values <= bound, ">=": values >= bound,
-                    "<": values < bound, ">": values > bound}[op]
+            bound = float(spec[len(op) :])
+            return {"<=": values <= bound, ">=": values >= bound, "<": values < bound, ">": values > bound}[
+                op
+            ]
     lo, hi = (float(x) for x in spec[1:-1].split(","))
     lower = values >= lo if spec[0] == "[" else values > lo
     upper = values <= hi if spec[-1] == "]" else values < hi
@@ -105,8 +113,9 @@ def age_band(edad: pd.Series, labels: list[str]) -> pd.Series:
     lowers = sorted((float(label.replace("+", "-").partition("-")[0]), label) for label in labels)
     bounds = np.array([lo for lo, _ in lowers])
     idx = (np.searchsorted(bounds, edad.to_numpy(dtype=float), side="right") - 1).clip(min=0)
-    return pd.Series(np.array([lab for _, lab in lowers], dtype=object)[idx],
-                     index=edad.index, dtype="string")
+    return pd.Series(
+        np.array([lab for _, lab in lowers], dtype=object)[idx], index=edad.index, dtype="string"
+    )
 
 
 def quantile_assign(latent: pd.Series, target: dict) -> tuple[pd.Series, pd.Series]:
@@ -121,8 +130,10 @@ def quantile_assign(latent: pd.Series, target: dict) -> tuple[pd.Series, pd.Seri
     idx = np.searchsorted(upper, pct.to_numpy(), side="right").clip(max=len(names) - 1)
     lower = np.concatenate([[0.0], upper[:-1]])
     within = (pct.to_numpy() - lower[idx]) / (upper[idx] - lower[idx])
-    return (pd.Series(np.array(names, dtype=object)[idx], index=latent.index, dtype="string"),
-            pd.Series(within.clip(0, 1 - 1e-9), index=latent.index))
+    return (
+        pd.Series(np.array(names, dtype=object)[idx], index=latent.index, dtype="string"),
+        pd.Series(within.clip(0, 1 - 1e-9), index=latent.index),
+    )
 
 
 def employment_group(df: pd.DataFrame, cap_cfg: dict) -> pd.Series:
@@ -143,13 +154,13 @@ def build_stage1_table(processed_dir: Path | None = None) -> pd.DataFrame:
     table = pd.DataFrame({k: epf[v] for k, v in HOUSEHOLD_COLUMNS_FROM_EPF.items()})
     before = len(table)
     table = table[table["net_income_annual_eur"].notna()].reset_index(drop=True)
-    log.info("Stage-1 table: %d EPF households (%d dropped without income)", len(table),
-             before - len(table))
+    log.info("Stage-1 table: %d EPF households (%d dropped without income)", len(table), before - len(table))
     return table
 
 
-def resolve_inputs(df: pd.DataFrame, cfg: dict, donor_pool: pd.DataFrame | None,
-                   rng: np.random.Generator) -> pd.DataFrame:
+def resolve_inputs(
+    df: pd.DataFrame, cfg: dict, donor_pool: pd.DataFrame | None, rng: np.random.Generator
+) -> pd.DataFrame:
     """Give every row a coherent household-finance block.
 
     Rows that already carry the block (EPF, SDV samples, earlier resolution) keep it.
@@ -174,13 +185,13 @@ def resolve_inputs(df: pd.DataFrame, cfg: dict, donor_pool: pd.DataFrame | None,
     block = res["household_finance_block"]
     for col in block:
         df[col] = pd.to_numeric(df[col], errors="coerce") if col in df else np.nan
-    df["contract_type"] = (df["contract_type"] if "contract_type" in df else pd.NA)
+    df["contract_type"] = df["contract_type"] if "contract_type" in df else pd.NA
     df["contract_type"] = df["contract_type"].astype("string")
     df["employment_group"] = employment_group(df, cap_cfg)
     df["age_band_10"] = _age_band_10(df["edad"])
 
     prov = res["donor_imputation"]["provenance_column"]
-    needs = df[block[:3]].isna().any(axis=1)          # income, expenses, debt service
+    needs = df[block[:3]].isna().any(axis=1)  # income, expenses, debt service
     if prov not in df:
         df[prov] = pd.Series("observed", index=df.index, dtype="string")
     df.loc[needs, prov] = "donor_epf"
@@ -190,15 +201,24 @@ def resolve_inputs(df: pd.DataFrame, cfg: dict, donor_pool: pd.DataFrame | None,
         donors = donor_pool.copy()
         donors["employment_group"] = employment_group(donors, cap_cfg)
         donors["age_band_10"] = _age_band_10(donors["edad"])
-        idx = _hot_deck(df.loc[needs], donors, res["donor_imputation"]["cells"],
-                        res["donor_imputation"]["weight_column"], rng)
+        idx = _hot_deck(
+            df.loc[needs],
+            donors,
+            res["donor_imputation"]["cells"],
+            res["donor_imputation"]["weight_column"],
+            rng,
+        )
         for col in block + ["contract_type"]:
             values = donors.loc[idx, col].to_numpy()
             if col == "contract_type":
                 values = pd.array(values, dtype="string")
             df.loc[needs, col] = df.loc[needs, col].fillna(pd.Series(values, index=df.index[needs]))
-        log.info("Household finances: %d observed, %d donor-imputed from %d EPF households",
-                 (~needs).sum(), needs.sum(), len(donors))
+        log.info(
+            "Household finances: %d observed, %d donor-imputed from %d EPF households",
+            (~needs).sum(),
+            needs.sum(),
+            len(donors),
+        )
     return df
 
 
@@ -207,11 +227,17 @@ def _age_band_10(edad: pd.Series) -> pd.Series:
     return (np.maximum(edad.clip(upper=79) // 10 * 10, 20)).astype(int).astype(str)
 
 
-def _hot_deck(recipients: pd.DataFrame, donors: pd.DataFrame, cell_levels: list,
-              weight_col: str, rng: np.random.Generator, min_donors: int = 20) -> np.ndarray:
+def _hot_deck(
+    recipients: pd.DataFrame,
+    donors: pd.DataFrame,
+    cell_levels: list,
+    weight_col: str,
+    rng: np.random.Generator,
+    min_donors: int = 20,
+) -> np.ndarray:
     """Weighted donor index per recipient, falling back to coarser cells when a cell is thin."""
     chosen = pd.Series(-1, index=recipients.index)
-    for cells in cell_levels + [[]]:                  # [] = whole pool, the last resort
+    for cells in cell_levels + [[]]:  # [] = whole pool, the last resort
         todo = chosen[chosen < 0].index
         if todo.empty:
             break
@@ -229,10 +255,11 @@ def _hot_deck(recipients: pd.DataFrame, donors: pd.DataFrame, cell_levels: list,
 # --------------------------------------------------------------------------- #
 # Features
 # --------------------------------------------------------------------------- #
-TERMS = {   # names referenced by the config `terms`; `p` is the generation block
+TERMS = {  # names referenced by the config `terms`; `p` is the generation block
     "age_centered_40": lambda d, p: d["edad"] - 40,
-    "log_income_rel_median": lambda d, p: np.log(d["net_income_annual_eur"].clip(lower=1)
-                                                 / p["income_reference_eur"]),
+    "log_income_rel_median": lambda d, p: np.log(
+        d["net_income_annual_eur"].clip(lower=1) / p["income_reference_eur"]
+    ),
     "surplus_ratio": lambda d, p: d["surplus_ratio"].clip(-1, 1).fillna(-1),
     "university_education": lambda d, p: d["nivel_estudios"].eq("universitario"),
     "unemployed": lambda d, p: d["employment_group"].eq("desempleado"),
@@ -276,13 +303,16 @@ def derive_liquid_savings(df: pd.DataFrame, cfg: dict, rng: np.random.Generator)
         df["liquid_savings_eur"] = np.nan
     missing = df["liquid_savings_eur"].isna()
     df["liquid_savings_source"] = pd.Series("generator", index=df.index, dtype="string").mask(
-        missing, "assumption_model")
+        missing, "assumption_model"
+    )
     if missing.any():
-        median = points(df.loc[missing, "surplus_ratio"].fillna(-1),
-                        spec["median_months_of_expenses_by_surplus_ratio"])
+        median = points(
+            df.loc[missing, "surplus_ratio"].fillna(-1), spec["median_months_of_expenses_by_surplus_ratio"]
+        )
         months = np.exp(np.log(median) + rng.normal(0, spec["sigma"], missing.sum()))
         df.loc[missing, "liquid_savings_eur"] = (
-            months * df.loc[missing, "household_expenses_annual_eur"] / 12).round(-1)
+            months * df.loc[missing, "household_expenses_annual_eur"] / 12
+        ).round(-1)
     return df
 
 
@@ -312,15 +342,17 @@ def sample_horizon(df: pd.DataFrame, cfg: dict, rng: np.random.Generator) -> pd.
     n = len(df)
     years = pd.Series(np.nan, index=df.index)
     ret = goal == "Retirement"
-    years[ret] = (np.maximum(1, s["retirement_age"] - df.loc[ret, "edad"])
-                  + rng.normal(0, 1, ret.sum()))
+    years[ret] = np.maximum(1, s["retirement_age"] - df.loc[ret, "edad"]) + rng.normal(0, 1, ret.sum())
     for name, spec in by_goal.items():
         if "distribution" not in spec:
             continue
         m = goal == name
         p = spec["params"]
-        draw = (rng.uniform(p["low"], p["high"], n) if spec["distribution"] == "uniform"
-                else rng.triangular(p["low"], p["mode"], p["high"], n))
+        draw = (
+            rng.uniform(p["low"], p["high"], n)
+            if spec["distribution"] == "uniform"
+            else rng.triangular(p["low"], p["mode"], p["high"], n)
+        )
         years[m] = draw[m.to_numpy()]
     lo, hi = feat["range"]
     cap = (s["life_horizon_cap_age"] - df["edad"]).clip(lower=lo)
@@ -333,8 +365,9 @@ def derive_risk_tolerance(df: pd.DataFrame, cfg: dict, rng: np.random.Generator)
     category, within = quantile_assign(latent_score(df, gen, rng), gen["target_distribution"])
     cat_min = category.map({k: v["min"] for k, v in feat["categories"].items()}).astype(int)
     cat_max = category.map({k: v["max"] for k, v in feat["categories"].items()}).astype(int)
-    df["risk_tolerance_score"] = (cat_min + np.floor(within * (cat_max - cat_min + 1))).clip(
-        upper=cat_max).astype(int)
+    df["risk_tolerance_score"] = (
+        (cat_min + np.floor(within * (cat_max - cat_min + 1))).clip(upper=cat_max).astype(int)
+    )
     df[feat["category_column"]] = category_from_score(df["risk_tolerance_score"], feat["categories"])
     return df
 
@@ -393,11 +426,13 @@ def compute_capacity(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     cap_cfg = schema(cfg)["supporting_features"]["risk_capacity_score"]
     pts = cap_cfg["points"]
     df["employment_stability"] = employment_stability(df, cap_cfg)
-    total = (points(df["surplus_ratio"], pts["surplus_ratio"])
-             + points(df["investment_horizon_bucket"], pts["investment_horizon_bucket"])
-             + points(df["debt_service_to_income"].fillna(np.inf), pts["debt_service_to_income"])
-             + points(df["employment_stability"], pts["employment_stability"])
-             + points(df["liquidity_need_pct"], pts["liquidity_need_pct"]))
+    total = (
+        points(df["surplus_ratio"], pts["surplus_ratio"])
+        + points(df["investment_horizon_bucket"], pts["investment_horizon_bucket"])
+        + points(df["debt_service_to_income"].fillna(np.inf), pts["debt_service_to_income"])
+        + points(df["employment_stability"], pts["employment_stability"])
+        + points(df["liquidity_need_pct"], pts["liquidity_need_pct"])
+    )
     lo, hi = cap_cfg["clip"]
     score = total.clip(lo, hi)
     applied = pd.Series("", index=df.index, dtype="string")
@@ -413,9 +448,9 @@ def compute_capacity(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
     # Product feasibility: cannot meet the robo-advisor's minimum initial or monthly amount
     product = cfg.get("edge_case_profiles", {}).get("robo_advisor_product")
     if product:
-        df["flag_minimum_investment"] = (
-            (df["liquid_savings_eur"] < product["min_initial_investment_eur"])
-            | (df["investable_surplus_eur"] < 12 * product["min_monthly_contribution_eur"]))
+        df["flag_minimum_investment"] = (df["liquid_savings_eur"] < product["min_initial_investment_eur"]) | (
+            df["investable_surplus_eur"] < 12 * product["min_monthly_contribution_eur"]
+        )
     return df
 
 

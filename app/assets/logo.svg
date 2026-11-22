@@ -1,1 +1,5 @@
-<svg width="64" height="64" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RiskSynth AI"><rect width="32" height="32" rx="3" fill="#1e88e5"/><path d="M17 14 L26.5 4.5" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linejoin="round" stroke-opacity="0.5"/><path d="M5.5 25.5 L17 14 L27 14" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linejoin="round"/></svg>
+<svg width="64" height="64" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="RiskSynth AI">
+  <rect width="32" height="32" rx="3" fill="#1e88e5"/>
+  <path d="M17 14 L26.5 4.5" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linejoin="round" stroke-opacity="0.5"/>
+  <path d="M5.5 25.5 L17 14 L27 14" fill="none" stroke="#ffffff" stroke-width="3.4" stroke-linejoin="round"/>
+</svg>

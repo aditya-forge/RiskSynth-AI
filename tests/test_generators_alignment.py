@@ -1,5 +1,6 @@
 # Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Generator alignment with EPF data, stage-1 samplers, CSV reading and console encoding."""
+
 from __future__ import annotations
 
 import json
@@ -51,7 +52,9 @@ def test_loan_book_matches_wealth_debt_service(gen, gen_report):
 def test_payload_follows_epf_income_and_spending(gen):
     assert gen["ingresos_anuales"].corr(gen["net_income_annual_eur"]) > 0.99
     assert gen["gastos_anuales"].corr(gen["household_expenses_annual_eur"]) > 0.99
-    assert (gen["tasa_ahorro"] < 0).mean() > 0.2, "EPF-aligned spending yields negative saving for many households"
+    assert (
+        gen["tasa_ahorro"] < 0
+    ).mean() > 0.2, "EPF-aligned spending yields negative saving for many households"
 
 
 @pytest.mark.parametrize("mortgage_monthly, expect", [(0.0, False), (650.0, True)])
@@ -66,8 +69,10 @@ def test_gen_accounts_mortgage_modes(mortgage_monthly, expect):
 
 def test_gen_accounts_legacy_random_mortgage_still_available():
     random.seed(0)
-    shares = [any(l["type"] == "mortgage" for l in gs.gen_accounts(2500, n_cuentas=1)[0]["loans"])
-              for _ in range(400)]
+    shares = [
+        any(l["type"] == "mortgage" for l in gs.gen_accounts(2500, n_cuentas=1)[0]["loans"])
+        for _ in range(400)
+    ]
     assert 0.2 < np.mean(shares) < 0.4, "without EPF data the legacy 30% rule applies"
 
 
@@ -115,9 +120,15 @@ def test_bootstrap_sampler_end_to_end(require_processed, tmp_path):
 
 def test_wealth_overrides_reach_stage2(require_processed, data_cfg):
     import copy
+
     cfg = copy.deepcopy(data_cfg)
     gen_cfg = cfg["wealth_profile_schema"]["features"]["risk_tolerance_score"]["generation"]
-    gen_cfg["target_distribution"] = {"Conservative": 0.25, "Moderate": 0.25, "Aggressive": 0.25, "Ultra-Aggressive": 0.25}
+    gen_cfg["target_distribution"] = {
+        "Conservative": 0.25,
+        "Moderate": 0.25,
+        "Aggressive": 0.25,
+        "Ultra-Aggressive": 0.25,
+    }
     g = cg.ClientGenerator(n_samples=2000, method="bootstrap", seed=4)
     g.fit(wp.build_stage1_table())
     df = g.generate(wealth_config=cfg, edge_case_share=0.0)
@@ -174,10 +185,19 @@ def test_generator_stdout_is_cp1252_safe(require_processed, tmp_path, monkeypatc
 @pytest.mark.slow
 def test_cli_runs_piped_on_cp1252(require_processed, tmp_path):
     env = {k: v for k, v in os.environ.items() if k not in ("PYTHONIOENCODING", "PYTHONUTF8")}
-    env.update(RISKSYNTH_OUTPUT_DIR=str(tmp_path), PYTHONIOENCODING="cp1252",
-               PYTHONPATH=os.pathsep.join(filter(None, [str(ROOT / "src"), env.get("PYTHONPATH")])))
-    proc = subprocess.run([sys.executable, "-m", "risksynth.generators.generate_synthetic"],
-                          input=b"300\n\n1\n300\n", capture_output=True, env=env, timeout=600, cwd=tmp_path)
+    env.update(
+        RISKSYNTH_OUTPUT_DIR=str(tmp_path),
+        PYTHONIOENCODING="cp1252",
+        PYTHONPATH=os.pathsep.join(filter(None, [str(ROOT / "src"), env.get("PYTHONPATH")])),
+    )
+    proc = subprocess.run(
+        [sys.executable, "-m", "risksynth.generators.generate_synthetic"],
+        input=b"300\n\n1\n300\n",
+        capture_output=True,
+        env=env,
+        timeout=600,
+        cwd=tmp_path,
+    )
     assert proc.returncode == 0, proc.stderr.decode("cp1252", "replace")[-2000:]
     assert proc.stdout.isascii() and b"Traceback" not in proc.stderr
     assert list(tmp_path.glob("synthetic_300_auto_*.parquet")), "outputs honour RISKSYNTH_OUTPUT_DIR"

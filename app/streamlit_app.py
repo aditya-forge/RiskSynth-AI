@@ -11,6 +11,7 @@ Pages (app/views/):
 
 Run:  streamlit run app/streamlit_app.py
 """
+
 import sys
 from pathlib import Path
 
@@ -25,16 +26,20 @@ from portal import PAGES  # noqa: E402
 from portal.theme import inject_css  # noqa: E402
 from portal.ui import footer, header  # noqa: E402
 
-st.set_page_config(page_title="RiskSynth AI", page_icon=str(APP_DIR / "assets" / "favicon.png"), layout="wide")
+st.set_page_config(
+    page_title="RiskSynth AI", page_icon=str(APP_DIR / "assets" / "favicon.png"), layout="wide"
+)
 inject_css()
 
-PAGES.update({
-    "overview": st.Page("views/overview.py", title="Overview", url_path="overview", default=True),
-    "architecture": st.Page("views/architecture.py", title="Architecture", url_path="architecture"),
-    "generator": st.Page("views/generator.py", title="Generator", url_path="generator"),
-    "simulator": st.Page("views/simulator.py", title="Advisory Simulator", url_path="simulator"),
-    "compliance": st.Page("views/compliance.py", title="Compliance & Fidelity", url_path="compliance"),
-})
+PAGES.update(
+    {
+        "overview": st.Page("views/overview.py", title="Overview", url_path="overview", default=True),
+        "architecture": st.Page("views/architecture.py", title="Architecture", url_path="architecture"),
+        "generator": st.Page("views/generator.py", title="Generator", url_path="generator"),
+        "simulator": st.Page("views/simulator.py", title="Advisory Simulator", url_path="simulator"),
+        "compliance": st.Page("views/compliance.py", title="Compliance & Fidelity", url_path="compliance"),
+    }
+)
 current = st.navigation(list(PAGES.values()), position="hidden")
 header(PAGES, current)
 current.run()

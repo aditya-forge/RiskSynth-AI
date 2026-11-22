@@ -1,5 +1,6 @@
 # Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Streamlit portal smoke tests (headless AppTest): header, every page, first-visit demo flow."""
+
 from __future__ import annotations
 
 import shutil
@@ -58,7 +59,9 @@ def test_generator_presets_fill_the_form(require_processed):
     at = _app()
     at.switch_page("views/generator.py")
     at.run()
-    [b for b in at.button if b.label == "Use this scenario"][0].click()  # first unselected preset: edge-case stress
+    [b for b in at.button if b.label == "Use this scenario"][
+        0
+    ].click()  # first unselected preset: edge-case stress
     at.run()
     assert not at.exception
     assert at.session_state["gen_edge"] == 15.0
@@ -76,9 +79,14 @@ def test_generated_dataset_feeds_simulator_and_compliance(require_processed):
     run_dir = Path(at.session_state["last_run"])
     try:
         assert not at.exception and (run_dir / "profiles.parquet").exists()
-        assert [b.label for b in at.get("download_button")] == ["Download CSV", "Download Parquet",
-                                                                "Download JSON metadata", "Download run contract"]
+        assert [b.label for b in at.get("download_button")] == [
+            "Download CSV",
+            "Download Parquet",
+            "Download JSON metadata",
+            "Download run contract",
+        ]
         from risksynth import contract
+
         c = contract.load(run_dir / "run_contract.json")
         assert c["parameters"]["rows"] == 1000 and c["assumptions"]
         assert contract.verify(c, pd.read_parquet(run_dir / "profiles.parquet")) == []

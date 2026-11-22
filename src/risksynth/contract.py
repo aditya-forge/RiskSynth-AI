@@ -20,6 +20,7 @@ regenerates the same rows on the same code and configs. verify() reports any dri
     df = contract.reproduce(c)
     assert contract.verify(c, df) == []
 """
+
 from __future__ import annotations
 
 import copy
@@ -36,10 +37,14 @@ from risksynth.engine import wealth_profile as wp
 from risksynth.paths import DATA_CONFIG, MODEL_CONFIG, PROCESSED_DIR
 
 CONTRACT_VERSION = "1.0"
-COPYRIGHT = ("Generated with RiskSynth AI. Copyright (c) 2026 aditya-forge. All rights reserved; "
-             "not licensed for reuse without written permission. See LICENSE.")
-CALIBRATION_NOTE = ("Parameters marked [ASSUMPTION] are design choices, not measurements. Calibrate them against "
-                    "the Banco de Espana EFF 2022 survey before any production use.")
+COPYRIGHT = (
+    "Generated with RiskSynth AI. Copyright (c) 2026 aditya-forge. All rights reserved; "
+    "not licensed for reuse without written permission. See LICENSE."
+)
+CALIBRATION_NOTE = (
+    "Parameters marked [ASSUMPTION] are design choices, not measurements. Calibrate them against "
+    "the Banco de Espana EFF 2022 survey before any production use."
+)
 _ASSUMPTION = re.compile(r"\[ASSUMPTION\]\s*[:\-]?\s*(.*)$")
 
 
@@ -69,15 +74,20 @@ def assumptions(paths: tuple[Path, ...] = (DATA_CONFIG, MODEL_CONFIG)) -> list[d
                 while stack and stack[-1][0] >= indent:
                     stack.pop()
                 stack.append((indent, key.group(2)))
-                for item in pending:                       # a section header comment names the next block
+                for item in pending:  # a section header comment names the next block
                     item["key"] = key.group(2)
                 pending.clear()
             path_keys = [k for i, k in stack] if key else [k for i, k in stack if i < indent]
             m = _ASSUMPTION.search(line)
-            if m and not m.group(1).startswith("="):          # skip the legend lines that define the tag
-                found.append({"file": Path(path).name, "line": no,
-                              "key": ".".join(path_keys),
-                              "note": m.group(1).strip() or None})
+            if m and not m.group(1).startswith("="):  # skip the legend lines that define the tag
+                found.append(
+                    {
+                        "file": Path(path).name,
+                        "line": no,
+                        "key": ".".join(path_keys),
+                        "note": m.group(1).strip() or None,
+                    }
+                )
                 if not path_keys:
                     pending.append(found[-1])
     return found
@@ -86,28 +96,41 @@ def assumptions(paths: tuple[Path, ...] = (DATA_CONFIG, MODEL_CONFIG)) -> list[d
 def run_config(cfg: dict, risk_mix_pct: dict) -> dict:
     """data_config with the run's target risk mix applied (percentages in, shares stored)."""
     out = copy.deepcopy(cfg)
-    out["wealth_profile_schema"]["features"]["risk_tolerance_score"]["generation"][
-        "target_distribution"] = {k: v / 100 for k, v in risk_mix_pct.items()}
+    out["wealth_profile_schema"]["features"]["risk_tolerance_score"]["generation"]["target_distribution"] = {
+        k: v / 100 for k, v in risk_mix_pct.items()
+    }
     return out
 
 
-def generate(method: str, n: int, seed: int, edge_case_share: float, risk_mix_pct: dict,
-             sdv_model: str = "copula", cfg: dict | None = None, save_dir: Path | None = None,
-             progress: Callable[[str], None] = lambda _msg: None) -> tuple[pd.DataFrame, dict, dict]:
+def generate(
+    method: str,
+    n: int,
+    seed: int,
+    edge_case_share: float,
+    risk_mix_pct: dict,
+    sdv_model: str = "copula",
+    cfg: dict | None = None,
+    save_dir: Path | None = None,
+    progress: Callable[[str], None] = lambda _msg: None,
+) -> tuple[pd.DataFrame, dict, dict]:
     """Generate one dataset; returns (profiles, wealth report, extra files written)."""
     run_cfg = run_config(cfg or wp.load_config(), risk_mix_pct)
     if method == "Rule-based":
         from risksynth.generators import generate_synthetic as gs
+
         progress("Stage 1: sampling the INE persons base and resolving household finances")
         base = pd.read_parquet(PROCESSED_DIR / "combined_base.parquet")
         progress("Building banking payloads: accounts, loans, transactions")
         before = set(gs.OUTPUT_DIR.glob(f"synthetic_{n}_*_wealth_report.json"))
-        out = gs.generate_synthetic_data(n, base, n_jobs=1, batch_size=n, seed=seed,
-                                         wealth_cfg=run_cfg, edge_case_share=edge_case_share)
-        new = sorted(set(gs.OUTPUT_DIR.glob(f"synthetic_{n}_*_wealth_report.json")) - before) or \
-            sorted(gs.OUTPUT_DIR.glob(f"synthetic_{n}_*_wealth_report.json"))
+        out = gs.generate_synthetic_data(
+            n, base, n_jobs=1, batch_size=n, seed=seed, wealth_cfg=run_cfg, edge_case_share=edge_case_share
+        )
+        new = sorted(set(gs.OUTPUT_DIR.glob(f"synthetic_{n}_*_wealth_report.json")) - before) or sorted(
+            gs.OUTPUT_DIR.glob(f"synthetic_{n}_*_wealth_report.json")
+        )
         return out, json.loads(new[-1].read_text(encoding="utf-8")), {}
     from risksynth.generators.client_generator import ClientGenerator
+
     model = "bootstrap" if method == "Bootstrap sampler" else sdv_model
     stage1 = wp.build_stage1_table()
     progress(f"Stage 1: fitting {model} on {len(stage1):,} EPF households")
@@ -119,9 +142,19 @@ def generate(method: str, n: int, seed: int, edge_case_share: float, risk_mix_pc
     return out, gen.wealth_report or {}, files
 
 
-def build(*, method: str, stage1_model: str | None, sdv_model: str, rows: int, seed: int,
-          edge_case_share: float, risk_mix_pct: dict, report: dict, frame: pd.DataFrame,
-          cfg: dict | None = None) -> dict:
+def build(
+    *,
+    method: str,
+    stage1_model: str | None,
+    sdv_model: str,
+    rows: int,
+    seed: int,
+    edge_case_share: float,
+    risk_mix_pct: dict,
+    report: dict,
+    frame: pd.DataFrame,
+    cfg: dict | None = None,
+) -> dict:
     cfg = cfg or wp.load_config()
     s = wp.schema(cfg)
     ec = report.get("edge_cases") or {}
@@ -170,12 +203,21 @@ def build(*, method: str, stage1_model: str | None, sdv_model: str, rows: int, s
             "violations_exempted": report.get("violations_exempted"),
             "rows_inconsistent_after": report.get("rows_inconsistent_after"),
         },
-        "configs": {"data_config.yaml": file_sha256(DATA_CONFIG), "model_config.yaml": file_sha256(MODEL_CONFIG)},
+        "configs": {
+            "data_config.yaml": file_sha256(DATA_CONFIG),
+            "model_config.yaml": file_sha256(MODEL_CONFIG),
+        },
         "assumptions": assumptions(),
         "calibration_note": CALIBRATION_NOTE,
-        "output": {"rows": len(frame), "columns": list(map(str, frame.columns)), "sha256": frame_sha256(frame)},
-        "reproduce": ("from risksynth import contract; c = contract.load('run_contract.json'); "
-                      "df = contract.reproduce(c); assert contract.verify(c, df) == []"),
+        "output": {
+            "rows": len(frame),
+            "columns": list(map(str, frame.columns)),
+            "sha256": frame_sha256(frame),
+        },
+        "reproduce": (
+            "from risksynth import contract; c = contract.load('run_contract.json'); "
+            "df = contract.reproduce(c); assert contract.verify(c, df) == []"
+        ),
     }
 
 
@@ -186,9 +228,16 @@ def load(path: str | Path) -> dict:
 def reproduce(c: dict, cfg: dict | None = None, save_dir: Path | None = None) -> pd.DataFrame:
     """Regenerate the dataset a contract describes (same code path as the app)."""
     p = c["parameters"]
-    out, _, _ = generate(p["method"], int(p["rows"]), int(p["seed"]), float(p["edge_case_share"]),
-                         p["target_risk_mix_pct"], sdv_model=p.get("sdv_model") or "copula", cfg=cfg,
-                         save_dir=save_dir)
+    out, _, _ = generate(
+        p["method"],
+        int(p["rows"]),
+        int(p["seed"]),
+        float(p["edge_case_share"]),
+        p["target_risk_mix_pct"],
+        sdv_model=p.get("sdv_model") or "copula",
+        cfg=cfg,
+        save_dir=save_dir,
+    )
     return out
 
 

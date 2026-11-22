@@ -8,6 +8,7 @@ silently turns those clients into NaN and breaks the MiFID II "ESG preference
 collected" check. Always read profile CSVs with read_profiles() (or pass
 keep_default_na=False, na_values=CSV_NA_VALUES yourself). Parquet is unaffected.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,8 +16,26 @@ from pathlib import Path
 import pandas as pd
 
 # pandas' default NA tokens minus "None" (and its variants), which is a real ESG category
-CSV_NA_VALUES = ["", "#N/A", "#N/A N/A", "#NA", "-1.#IND", "-1.#QNAN", "-NaN", "-nan", "1.#IND",
-                 "1.#QNAN", "<NA>", "N/A", "NA", "NULL", "NaN", "n/a", "nan", "null"]
+CSV_NA_VALUES = [
+    "",
+    "#N/A",
+    "#N/A N/A",
+    "#NA",
+    "-1.#IND",
+    "-1.#QNAN",
+    "-NaN",
+    "-nan",
+    "1.#IND",
+    "1.#QNAN",
+    "<NA>",
+    "N/A",
+    "NA",
+    "NULL",
+    "NaN",
+    "n/a",
+    "nan",
+    "null",
+]
 
 
 def read_profiles(path: str | Path, **kwargs) -> pd.DataFrame:

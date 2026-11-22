@@ -1,5 +1,6 @@
 # Copyright (c) 2026 aditya-forge. All rights reserved. Proprietary; see LICENSE.
 """Counterfactual re-assessment, the EC01-EC09 scorecard and run contracts."""
+
 from __future__ import annotations
 
 import json
@@ -50,8 +51,9 @@ def test_ec08_drawdown_contradiction_is_relaxed_but_flags_reprofile(profiles, da
 
 def test_losing_all_surplus_caps_capacity(profiles, data_cfg):
     base = profiles[profiles["edge_case_id"].isna() & profiles["capacity_caps_applied"].isna()].iloc[0]
-    cf = counterfactual.reassess(base, {"household_expenses_annual_eur": float(base["net_income_annual_eur"]) * 2},
-                                 data_cfg)
+    cf = counterfactual.reassess(
+        base, {"household_expenses_annual_eur": float(base["net_income_annual_eur"]) * 2}, data_cfg
+    )
     assert "CAP_NO_SURPLUS" in cf["caps"]
     assert cf["profile"]["investable_surplus_eur"].iloc[0] == 0
     assert cf["effective_risk"] <= 5
@@ -59,7 +61,9 @@ def test_losing_all_surplus_caps_capacity(profiles, data_cfg):
 
 def test_contradictory_drawdown_breaks_cr02_for_a_base_client(profiles, data_cfg):
     base = profiles[profiles["edge_case_id"].isna()].iloc[0]
-    cf = counterfactual.reassess(base, {"risk_tolerance_score": 10, "max_acceptable_drawdown_pct": 1}, data_cfg)
+    cf = counterfactual.reassess(
+        base, {"risk_tolerance_score": 10, "max_acceptable_drawdown_pct": 1}, data_cfg
+    )
     assert "CR02" in cf["blocking_rules"] and cf["status"] == "Re-profile"
     assert cf["tolerance_category"] == "Ultra-Aggressive"
     assert cf["recommendation"]["rec_stress_loss_pct"] <= 1 + 0.05
@@ -86,7 +90,7 @@ def test_scorecard_covers_every_archetype_and_passes(profiles, data_cfg):
 def test_scorecard_fails_a_broken_assertion(profiles, data_cfg):
     broken = profiles.copy()
     m = broken["edge_case_id"].eq("EC05").fillna(False)
-    broken.loc[m, "effective_risk_score"] = 9          # EC05 asserts effective_risk_score <= 5
+    broken.loc[m, "effective_risk_score"] = 9  # EC05 asserts effective_risk_score <= 5
     card = scorecard.edge_case_scorecard(broken, cfg=data_cfg).set_index("id")
     assert card.at["EC05", "status"] == "FAIL" and card.at["EC05", "assertion_pass_pct"] == 0
 
@@ -116,8 +120,18 @@ def test_frame_hash_ignores_row_index_but_not_values():
 def test_bootstrap_run_is_reproduced_from_its_contract(require_processed, data_cfg, tmp_path):
     mix = {"Conservative": 40.0, "Moderate": 35.0, "Aggressive": 18.0, "Ultra-Aggressive": 7.0}
     out, report, _ = contract.generate("Bootstrap sampler", 600, 11, 0.08, mix, cfg=data_cfg)
-    c = contract.build(method="Bootstrap sampler", stage1_model="bootstrap", sdv_model="copula", rows=600, seed=11,
-                       edge_case_share=0.08, risk_mix_pct=mix, report=report, frame=out, cfg=data_cfg)
+    c = contract.build(
+        method="Bootstrap sampler",
+        stage1_model="bootstrap",
+        sdv_model="copula",
+        rows=600,
+        seed=11,
+        edge_case_share=0.08,
+        risk_mix_pct=mix,
+        report=report,
+        frame=out,
+        cfg=data_cfg,
+    )
     path = tmp_path / "run_contract.json"
     path.write_text(json.dumps(c, default=str), encoding="utf-8")
     c = contract.load(path)

@@ -17,6 +17,7 @@ Sources (``--source``):
 Per-survey outputs keep every raw INE column for auditability and add
 harmonized columns (edad, sexo, ccaa, nivel_estudios, situacion_laboral, ...).
 """
+
 import argparse
 import logging
 from pathlib import Path
@@ -35,13 +36,31 @@ log = logging.getLogger("process_data")
 # INE column names. ('gasto_total' was IMPEXACSP: the first column containing
 # "IMPEXAC", located between PERCEPSP and INTERINPSP in the EPF household file.)
 LEGACY_V1_RENAMES = {
-    "ecv": {"edad": "PB140", "sexo": "PB150", "ingresos_trabajo": "PY010G",
-            "ccaa": "DB040", "nivel_estudios": "PE040", "renta_disponible": "HY020",
-            "situacion_laboral": "PL031"},
-    "epf": {"ccaa": "CCAA", "n_miembros": "NMIEMB", "gasto_total": "IMPEXACSP",
-            "gasto_monetario": "GASTMON", "regimen_vivienda": "REGTEN"},
-    "epa": {"edad": "EDAD1", "sexo": "SEXO1", "ccaa": "CCAA", "situacion_laboral": "AOI",
-            "ocupacion": "CNO11", "sector": "SPTS", "tramo_salario": "SALAM1"},
+    "ecv": {
+        "edad": "PB140",
+        "sexo": "PB150",
+        "ingresos_trabajo": "PY010G",
+        "ccaa": "DB040",
+        "nivel_estudios": "PE040",
+        "renta_disponible": "HY020",
+        "situacion_laboral": "PL031",
+    },
+    "epf": {
+        "ccaa": "CCAA",
+        "n_miembros": "NMIEMB",
+        "gasto_total": "IMPEXACSP",
+        "gasto_monetario": "GASTMON",
+        "regimen_vivienda": "REGTEN",
+    },
+    "epa": {
+        "edad": "EDAD1",
+        "sexo": "SEXO1",
+        "ccaa": "CCAA",
+        "situacion_laboral": "AOI",
+        "ocupacion": "CNO11",
+        "sector": "SPTS",
+        "tramo_salario": "SALAM1",
+    },
 }
 
 
@@ -74,11 +93,15 @@ def load_raw(raw_dir: Path, layout: dict) -> dict:
     ecv_dir = raw_dir / layout["ecv"]["dir"]
     epf_dir = raw_dir / layout["epf"]["dir"]
     epa_path = raw_dir / layout["epa"]["dir"] / layout["epa"]["file"]
-    epa = (pd.read_csv(epa_path, sep="\t", encoding="latin-1", low_memory=False)
-           if epa_path.exists() else read_table(epa_path.parent))
+    epa = (
+        pd.read_csv(epa_path, sep="\t", encoding="latin-1", low_memory=False)
+        if epa_path.exists()
+        else read_table(epa_path.parent)
+    )
     return {
-        "ecv": {t: read_table(ecv_dir / layout["ecv"][t])
-                for t in ("personas", "hogares", "registro_hogares")},
+        "ecv": {
+            t: read_table(ecv_dir / layout["ecv"][t]) for t in ("personas", "hogares", "registro_hogares")
+        },
         "epf": {"hogar": read_table(epf_dir / layout["epf"]["hogar"])},
         "epa": {"personas": epa},
     }
@@ -126,8 +149,12 @@ def map_codes(series: pd.Series, mapping: dict, label: str) -> pd.Series:
     out = keys.map(lookup)
     unmapped = keys.notna() & out.isna()
     if unmapped.any():
-        log.warning("%s: %d values without mapping, e.g. %s", label, unmapped.sum(),
-                    keys[unmapped].value_counts().head(5).to_dict())
+        log.warning(
+            "%s: %d values without mapping, e.g. %s",
+            label,
+            unmapped.sum(),
+            keys[unmapped].value_counts().head(5).to_dict(),
+        )
     return out
 
 
@@ -167,8 +194,10 @@ def process_ecv(tables: dict, mapping: dict, harm: dict, reference_year: int) ->
     cols = mapping["columns"]
 
     df["hogar_id"] = pd.to_numeric(df[mapping["person_id"]]) // mapping["household_id_divisor"]
-    joins = [("hogares", mapping["household_file_id"], [cols["renta_disponible"]]),
-             ("registro_hogares", mapping["register_file_id"], [cols["ccaa"], "DB090"])]
+    joins = [
+        ("hogares", mapping["household_file_id"], [cols["renta_disponible"]]),
+        ("registro_hogares", mapping["register_file_id"], [cols["ccaa"], "DB090"]),
+    ]
     for table, key, wanted in joins:
         other = tables.get(table)
         if other is None:
@@ -178,8 +207,7 @@ def process_ecv(tables: dict, mapping: dict, harm: dict, reference_year: int) ->
         keep = [c for c in wanted if c in other.columns]
         other = other[[key] + keep].assign(**{key: pd.to_numeric(other[key])})
         df = df.merge(other, left_on="hogar_id", right_on=key, how="left", validate="m:1")
-        log.info("ECV join %s on %s: %.1f%% of persons matched", table, key,
-                 100 * df[key].notna().mean())
+        log.info("ECV join %s on %s: %.1f%% of persons matched", table, key, 100 * df[key].notna().mean())
 
     # Age: year of birth -> age attained in the interview year (ISSUE-01)
     birth = pd.to_numeric(df[mapping["birth_year_column"]], errors="coerce")
@@ -192,17 +220,20 @@ def process_ecv(tables: dict, mapping: dict, harm: dict, reference_year: int) ->
     df["edad_precision"] = np.where(top_coded, "exact_topcoded", "exact")
 
     df["sexo"] = map_codes(df[cols["sexo"]], harm["sexo"]["ecv"], "ECV sexo").astype("Int8")
-    df["nivel_estudios"] = map_codes(df[cols["nivel_estudios"]], harm["nivel_estudios"]["ecv"],
-                                     "ECV nivel_estudios")
-    df["situacion_laboral"] = map_codes(df[cols["situacion_laboral"]],
-                                        harm["situacion_laboral"]["ecv"], "ECV situacion_laboral")
+    df["nivel_estudios"] = map_codes(
+        df[cols["nivel_estudios"]], harm["nivel_estudios"]["ecv"], "ECV nivel_estudios"
+    )
+    df["situacion_laboral"] = map_codes(
+        df[cols["situacion_laboral"]], harm["situacion_laboral"]["ecv"], "ECV situacion_laboral"
+    )
     df["ingresos_trabajo"] = pd.to_numeric(df.get(cols["ingresos_trabajo"]), errors="coerce")
     df["renta_disponible"] = pd.to_numeric(df.get(cols["renta_disponible"]), errors="coerce")
     df["ccaa"] = df[cols["ccaa"]].astype("string").str.strip() if cols["ccaa"] in df else pd.NA
 
     components = [c for c in mapping["personal_net_income_components"] if c in df.columns]
-    df["renta_neta_personal_eur"] = (df[components].apply(pd.to_numeric, errors="coerce")
-                                     .sum(axis=1, min_count=1))
+    df["renta_neta_personal_eur"] = (
+        df[components].apply(pd.to_numeric, errors="coerce").sum(axis=1, min_count=1)
+    )
     df["peso"] = pd.to_numeric(df[mapping["weight_column"]], errors="coerce")
     df["fuente"] = "ECV"
     return df
@@ -224,12 +255,15 @@ def process_epf(tables: dict, mapping: dict, harm: dict) -> pd.DataFrame | None:
     new["edad_precision"] = "exact"
     new["sexo"] = map_codes(df[cols["sexo"]], harm["sexo"]["epf"], "EPF sexo").astype("Int8")
     new["ccaa"] = map_codes(df[cols["ccaa"]], harm["ccaa_ine_to_nuts2"], "EPF ccaa")
-    new["nivel_estudios"] = map_codes(df[cols["nivel_estudios"]], harm["nivel_estudios"]["epf"],
-                                      "EPF nivel_estudios")
-    new["situacion_laboral"] = map_codes(df[cols["situacion_laboral"]],
-                                         harm["situacion_laboral"]["epf"], "EPF situacion_laboral")
-    new["contract_type"] = map_codes(df[cols["contract_type"]], harm["contract_type"]["epf"],
-                                     "EPF contract_type")
+    new["nivel_estudios"] = map_codes(
+        df[cols["nivel_estudios"]], harm["nivel_estudios"]["epf"], "EPF nivel_estudios"
+    )
+    new["situacion_laboral"] = map_codes(
+        df[cols["situacion_laboral"]], harm["situacion_laboral"]["epf"], "EPF situacion_laboral"
+    )
+    new["contract_type"] = map_codes(
+        df[cols["contract_type"]], harm["contract_type"]["epf"], "EPF contract_type"
+    )
 
     # Grossed-up expenditure -> EUR per household per year (ISSUE-02, ISSUE-03)
     for target, source in mapping["grossed_up_expenditure"].items():
@@ -240,8 +274,11 @@ def process_epf(tables: dict, mapping: dict, harm: dict) -> pd.DataFrame | None:
     bracket = df[income["bracket"]].mask(df[income["bracket"]].isin(income["invalid_bracket_codes"]))
     imputed = bracket.map({int(k): v for k, v in income["bracket_impute_median"].items()})
     new["net_income_annual_eur"] = 12 * exact.fillna(imputed)
-    new["net_income_source"] = (pd.Series("bracket_median", index=df.index, dtype="string")
-                                .where(imputed.notna()).mask(exact.notna(), "exact"))
+    new["net_income_source"] = (
+        pd.Series("bracket_median", index=df.index, dtype="string")
+        .where(imputed.notna())
+        .mask(exact.notna(), "exact")
+    )
 
     debt = mapping["debt_service"]
     monthly = df[debt["principal"]].clip(lower=0).fillna(0) + df[debt["interest"]].clip(lower=0).fillna(0)
@@ -254,7 +291,8 @@ def process_epf(tables: dict, mapping: dict, harm: dict) -> pd.DataFrame | None:
     lo, hi = mapping["expected_median_gasto_monetario_eur"]
     median = df["gasto_monetario"].median()
     (log.info if lo <= median <= hi else log.warning)(
-        "EPF median gasto_monetario = %.0f EUR/household/year (expected %s-%s)", median, lo, hi)
+        "EPF median gasto_monetario = %.0f EUR/household/year (expected %s-%s)", median, lo, hi
+    )
     return df
 
 
@@ -269,24 +307,27 @@ def process_epa(tables: dict, mapping: dict, harm: dict, open_band_age: float) -
     bands = {_canon(k): v for k, v in mapping["age_bands"].items()}
     band = df[mapping["age_band_column"]].map(_canon)
     df["edad_min"] = band.map(lambda b: bands[b][0] if b in bands else np.nan).astype("float")
-    df["edad_max"] = band.map(lambda b: bands[b][1] if b in bands and bands[b][1] is not None
-                              else np.nan).astype("float")
+    df["edad_max"] = band.map(
+        lambda b: bands[b][1] if b in bands and bands[b][1] is not None else np.nan
+    ).astype("float")
     open_band = df["edad_min"].notna() & df["edad_max"].isna()
     df["edad"] = ((df["edad_min"] + df["edad_max"]) / 2).mask(open_band, open_band_age)
     df["edad_precision"] = "band5"
     unknown = band.notna() & ~band.isin(bands)
     if unknown.any():
-        log.warning("EPA: %d rows with unknown age band codes %s", unknown.sum(),
-                    band[unknown].unique()[:5])
+        log.warning("EPA: %d rows with unknown age band codes %s", unknown.sum(), band[unknown].unique()[:5])
 
     df["sexo"] = map_codes(df[cols["sexo"]], harm["sexo"]["epa"], "EPA sexo").astype("Int8")
     df["ccaa"] = map_codes(df[cols["ccaa"]], harm["ccaa_ine_to_nuts2"], "EPA ccaa")
-    df["situacion_laboral"] = map_codes(df[cols["situacion_laboral"]],
-                                        harm["situacion_laboral"]["epa"], "EPA situacion_laboral")
-    df["nivel_estudios"] = map_codes(df[cols["nivel_estudios"]], harm["nivel_estudios"]["epa"],
-                                     "EPA nivel_estudios")
-    df["contract_type"] = map_codes(df[cols["contract_type"]], harm["contract_type"]["epa"],
-                                    "EPA contract_type")
+    df["situacion_laboral"] = map_codes(
+        df[cols["situacion_laboral"]], harm["situacion_laboral"]["epa"], "EPA situacion_laboral"
+    )
+    df["nivel_estudios"] = map_codes(
+        df[cols["nivel_estudios"]], harm["nivel_estudios"]["epa"], "EPA nivel_estudios"
+    )
+    df["contract_type"] = map_codes(
+        df[cols["contract_type"]], harm["contract_type"]["epa"], "EPA contract_type"
+    )
     for target in ("ocupacion", "sector"):
         df[target] = df[cols[target]].map(_canon) if cols[target] in df else pd.NA
 
@@ -315,8 +356,15 @@ def validate(df: pd.DataFrame, name: str, rules: list) -> None:
             else:
                 continue
             level = logging.WARNING if bad.any() else logging.INFO
-            log.log(level, "[%s] rule %-22s on %-18s: %d violations (%.2f%%)",
-                    name, rule["name"], col, bad.sum(), 100 * bad.mean())
+            log.log(
+                level,
+                "[%s] rule %-22s on %-18s: %d violations (%.2f%%)",
+                name,
+                rule["name"],
+                col,
+                bad.sum(),
+                100 * bad.mean(),
+            )
 
 
 def summarize(df: pd.DataFrame, name: str, columns: list) -> None:
@@ -324,11 +372,24 @@ def summarize(df: pd.DataFrame, name: str, columns: list) -> None:
     for col in (c for c in columns if c in df.columns):
         s = df[col]
         if pd.api.types.is_numeric_dtype(s):
-            log.info("[%s]   %-26s null %5.1f%%  min %-10.4g p50 %-10.4g max %.4g", name, col,
-                     100 * s.isna().mean(), s.min(), s.median(), s.max())
+            log.info(
+                "[%s]   %-26s null %5.1f%%  min %-10.4g p50 %-10.4g max %.4g",
+                name,
+                col,
+                100 * s.isna().mean(),
+                s.min(),
+                s.median(),
+                s.max(),
+            )
         else:
-            log.info("[%s]   %-26s null %5.1f%%  %d distinct, top %s", name, col,
-                     100 * s.isna().mean(), s.nunique(), s.value_counts().head(3).to_dict())
+            log.info(
+                "[%s]   %-26s null %5.1f%%  %d distinct, top %s",
+                name,
+                col,
+                100 * s.isna().mean(),
+                s.nunique(),
+                s.value_counts().head(3).to_dict(),
+            )
 
 
 def build_combined(frames: list, columns: list, age_rule: dict) -> pd.DataFrame:
@@ -349,10 +410,24 @@ def build_combined(frames: list, columns: list, age_rule: dict) -> pd.DataFrame:
 # --------------------------------------------------------------------------- #
 # Entry point
 # --------------------------------------------------------------------------- #
-SUMMARY_COLUMNS = ["edad", "edad_precision", "sexo", "ccaa", "nivel_estudios", "situacion_laboral",
-                   "ingresos_trabajo", "renta_disponible", "renta_neta_personal_eur",
-                   "net_income_annual_eur", "gasto_total", "gasto_monetario",
-                   "debt_service_annual_eur", "main_residence_value_eur", "contract_type", "peso"]
+SUMMARY_COLUMNS = [
+    "edad",
+    "edad_precision",
+    "sexo",
+    "ccaa",
+    "nivel_estudios",
+    "situacion_laboral",
+    "ingresos_trabajo",
+    "renta_disponible",
+    "renta_neta_personal_eur",
+    "net_income_annual_eur",
+    "gasto_total",
+    "gasto_monetario",
+    "debt_service_annual_eur",
+    "main_residence_value_eur",
+    "contract_type",
+    "peso",
+]
 
 
 def run(source: str, config_path: Path) -> pd.DataFrame | None:
@@ -409,7 +484,9 @@ def run(source: str, config_path: Path) -> pd.DataFrame | None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     parser.add_argument("--source", choices=["auto", "raw", "legacy"], default="auto")
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)
     args = parser.parse_args()

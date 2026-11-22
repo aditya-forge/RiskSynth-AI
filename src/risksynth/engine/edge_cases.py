@@ -16,6 +16,7 @@ profile's `relaxed_rules` (EC08 relaxes CR02). Those exemptions are handed to
 consistency.enforce() so intentional traits survive while any other violation is still
 repaired. Fidelity tests should exclude edge_case_origin == "injected".
 """
+
 from __future__ import annotations
 
 import logging
@@ -29,9 +30,17 @@ from . import wealth_profile as wp
 log = logging.getLogger(__name__)
 
 # Columns an injection recipe may change; used to record edge_case_mutated_fields per row.
-MUTABLE = ["risk_tolerance_score", "risk_tolerance_category", "max_acceptable_drawdown_pct",
-           "primary_investment_goal", "investment_horizon_years", "investment_horizon_bucket",
-           "liquidity_need_pct", "liquid_savings_eur", "main_residence_value_eur"]
+MUTABLE = [
+    "risk_tolerance_score",
+    "risk_tolerance_category",
+    "max_acceptable_drawdown_pct",
+    "primary_investment_goal",
+    "investment_horizon_years",
+    "investment_horizon_bucket",
+    "liquidity_need_pct",
+    "liquid_savings_eur",
+    "main_residence_value_eur",
+]
 
 
 def spec(cfg: dict) -> dict:
@@ -59,8 +68,13 @@ def resolve_thresholds(df: pd.DataFrame, cfg: dict) -> dict:
 
 
 def predicate_masks(df: pd.DataFrame, cfg: dict, thresholds: dict) -> pd.DataFrame:
-    return pd.DataFrame({p["id"]: wp.evaluate(df, p["predicate"].format(**thresholds[p["id"]]))
-                         for p in spec(cfg)["profiles"]}, index=df.index)
+    return pd.DataFrame(
+        {
+            p["id"]: wp.evaluate(df, p["predicate"].format(**thresholds[p["id"]]))
+            for p in spec(cfg)["profiles"]
+        },
+        index=df.index,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -99,8 +113,9 @@ def _ec01(sub, rng, cfg, th):
 def _ec02(sub, rng, cfg, th):
     sub = _raise_score(sub, rng, cfg, 8)
     rich = sub["liquid_savings_eur"] >= 5000
-    sub.loc[rich, "liquid_savings_eur"] = pd.Series(rng.uniform(300, 4900, len(sub)),
-                                                    index=sub.index)[rich].round(-1)
+    sub.loc[rich, "liquid_savings_eur"] = pd.Series(rng.uniform(300, 4900, len(sub)), index=sub.index)[
+        rich
+    ].round(-1)
     return _rederive_liquidity(sub, rng, cfg, rich)
 
 
@@ -111,9 +126,14 @@ def _ec03(sub, rng, cfg, th):
     sub.loc[regoal, "primary_investment_goal"] = rng.choice(["Wealth Growth", "Retirement"], regoal.sum())
     redraw = regoal | (sub["investment_horizon_years"] > 9)
     retire = sub["primary_investment_goal"] == "Retirement"
-    years = np.where(retire, np.maximum(1, s["retirement_age"] - sub["edad"]) + rng.normal(0, 1, len(sub)),
-                     rng.uniform(2, 9, len(sub)))
-    sub.loc[redraw, "investment_horizon_years"] = pd.Series(years, index=sub.index)[redraw].clip(0.5, 9).round(1)
+    years = np.where(
+        retire,
+        np.maximum(1, s["retirement_age"] - sub["edad"]) + rng.normal(0, 1, len(sub)),
+        rng.uniform(2, 9, len(sub)),
+    )
+    sub.loc[redraw, "investment_horizon_years"] = (
+        pd.Series(years, index=sub.index)[redraw].clip(0.5, 9).round(1)
+    )
     sub = _rebucket(sub, cfg)
     sub = _raise_score(sub, rng, cfg, 7)
     return _rederive_liquidity(sub, rng, cfg, redraw)
@@ -128,32 +148,44 @@ def _ec06(sub, rng, cfg, th):
     sub.loc[regoal, "investment_horizon_years"] = years[regoal]
     sub = _rebucket(sub, cfg)
     low = sub["liquidity_need_pct"] < 50
-    sub.loc[low, "liquidity_need_pct"] = pd.Series(rng.uniform(50, 90, len(sub)), index=sub.index)[low].round()
+    sub.loc[low, "liquidity_need_pct"] = pd.Series(rng.uniform(50, 90, len(sub)), index=sub.index)[
+        low
+    ].round()
     return sub
 
 
 def _ec08(sub, rng, cfg, th):
     sub = _raise_score(sub, rng, cfg, 9, redraw_drawdown=False)
-    sub["max_acceptable_drawdown_pct"] = rng.integers(5, 11, len(sub)).astype(float)   # contradicts the band
+    sub["max_acceptable_drawdown_pct"] = rng.integers(5, 11, len(sub)).astype(float)  # contradicts the band
     return sub
 
 
 def _ec09(sub, rng, cfg, th):
     p90 = th["home_value_p90"]
     low = sub["main_residence_value_eur"] < p90
-    sub.loc[low, "main_residence_value_eur"] = pd.Series(rng.uniform(p90, 2.5 * p90, len(sub)),
-                                                         index=sub.index)[low].round(-3)
+    sub.loc[low, "main_residence_value_eur"] = pd.Series(
+        rng.uniform(p90, 2.5 * p90, len(sub)), index=sub.index
+    )[low].round(-3)
     return sub
 
 
-RECIPES = {   # id -> (candidate filter, mutation). Filters may use the profile's thresholds.
+RECIPES = {  # id -> (candidate filter, mutation). Filters may use the profile's thresholds.
     "EC01": ("net_income_annual_eur >= {income_p90}", _ec01),
-    "EC02": ("edad >= 18 and edad <= 30 and investable_surplus_eur < 2400 and investment_horizon_years >= 7", _ec02),
+    "EC02": (
+        "edad >= 18 and edad <= 30 and investable_surplus_eur < 2400 and investment_horizon_years >= 7",
+        _ec02,
+    ),
     "EC03": ("edad >= 58 and edad <= 66", _ec03),
     "EC04": ("raw_surplus_eur < 0", lambda sub, rng, cfg, th: _raise_score(sub, rng, cfg, 5)),
-    "EC05": ("debt_service_to_income >= {dsti_high}", lambda sub, rng, cfg, th: _raise_score(sub, rng, cfg, 7)),
+    "EC05": (
+        "debt_service_to_income >= {dsti_high}",
+        lambda sub, rng, cfg, th: _raise_score(sub, rng, cfg, 7),
+    ),
     "EC06": ("edad >= 67", _ec06),
-    "EC07": ("investment_horizon_bucket == 'Short'", lambda sub, rng, cfg, th: _raise_score(sub, rng, cfg, 7)),
+    "EC07": (
+        "investment_horizon_bucket == 'Short'",
+        lambda sub, rng, cfg, th: _raise_score(sub, rng, cfg, 7),
+    ),
     "EC08": ("edad >= 0", _ec08),
     "EC09": ("edad >= 60 and investable_surplus_eur == 0 and main_residence_value_eur > 0", _ec09),
 }
@@ -162,8 +194,9 @@ RECIPES = {   # id -> (candidate filter, mutation). Filters may use the profile'
 # --------------------------------------------------------------------------- #
 # Cohort construction
 # --------------------------------------------------------------------------- #
-def build_cohort(df: pd.DataFrame, cfg: dict, rng: np.random.Generator,
-                 total_share: float | None = None) -> tuple[pd.DataFrame, dict, dict]:
+def build_cohort(
+    df: pd.DataFrame, cfg: dict, rng: np.random.Generator, total_share: float | None = None
+) -> tuple[pd.DataFrame, dict, dict]:
     """Assign the stress-test cohort; returns (df, thresholds, per-profile fill stats)."""
     ec = spec(cfg)
     profiles = ec["profiles"]
@@ -202,7 +235,7 @@ def build_cohort(df: pd.DataFrame, cfg: dict, rng: np.random.Generator,
             eligible = primary.isna() & wp.evaluate(df, candidate_expr.format(**th))
             if not eligible.any():
                 break
-            preferred = df.index[eligible & ~any_natural].to_numpy()   # keep other natural matches intact
+            preferred = df.index[eligible & ~any_natural].to_numpy()  # keep other natural matches intact
             fallback = df.index[eligible & any_natural].to_numpy()
             size = min(int(eligible.sum()), max(2 * need, 10))
             batch = np.concatenate([rng.permutation(preferred), rng.permutation(fallback)])[:size]
@@ -211,19 +244,32 @@ def build_cohort(df: pd.DataFrame, cfg: dict, rng: np.random.Generator,
             accepted = sub.index[ok][:need]
             if len(accepted):
                 before, after = df.loc[accepted, MUTABLE], sub.loc[accepted, MUTABLE]
-                changed = (before.astype("string") != after.astype("string")).fillna(True) & \
-                          ~(before.isna() & after.isna())
+                changed = (before.astype("string") != after.astype("string")).fillna(True) & ~(
+                    before.isna() & after.isna()
+                )
                 mutated[accepted] = changed.apply(lambda r: "|".join(c for c in MUTABLE if r[c]), axis=1)
                 df.loc[accepted, sub.columns] = sub.loc[accepted, sub.columns]
                 primary[accepted], origin[accepted] = pid, "injected"
                 need -= len(accepted)
                 injected += len(accepted)
         if need > 0:
-            log.warning("%s: shortfall %d of quota %d (natural %d, injected %d, %d attempts)",
-                        pid, need, quota, len(take), injected, attempts)
-        stats[pid] = {"quota": quota, "natural_available": int(natural[pid].sum()),
-                      "natural_selected": int(len(take)), "injected": injected,
-                      "shortfall": int(need), "rejection_attempts": attempts}
+            log.warning(
+                "%s: shortfall %d of quota %d (natural %d, injected %d, %d attempts)",
+                pid,
+                need,
+                quota,
+                len(take),
+                injected,
+                attempts,
+            )
+        stats[pid] = {
+            "quota": quota,
+            "natural_available": int(natural[pid].sum()),
+            "natural_selected": int(len(take)),
+            "injected": injected,
+            "shortfall": int(need),
+            "rejection_attempts": attempts,
+        }
 
     tags = ec["tag_columns"]
     by_id = {p["id"]: p for p in profiles}
@@ -232,12 +278,17 @@ def build_cohort(df: pd.DataFrame, cfg: dict, rng: np.random.Generator,
     df[tags["flag"]] = primary.notna()
     df["edge_case_name"] = primary.map({k: v["name"] for k, v in by_id.items()}).astype("string")
     df[tags["behaviour"]] = primary.map(
-        {k: v["expected_advisory_outcome"]["recommendation"] for k, v in by_id.items()}).astype("string")
+        {k: v["expected_advisory_outcome"]["recommendation"] for k, v in by_id.items()}
+    ).astype("string")
     df["expected_capacity_override"] = primary.map(
-        {k: v["expected_advisory_outcome"]["capacity_override"] for k, v in by_id.items()}).astype("boolean")
-    df["edge_case_capacity_cap"] = primary.map({k: v["capacity_cap"] for k, v in by_id.items()}).astype("string")
+        {k: v["expected_advisory_outcome"]["capacity_override"] for k, v in by_id.items()}
+    ).astype("boolean")
+    df["edge_case_capacity_cap"] = primary.map({k: v["capacity_cap"] for k, v in by_id.items()}).astype(
+        "string"
+    )
     df["edge_case_assertion"] = primary.map(
-        {k: v["expected_advisory_outcome"]["test_assertion"] for k, v in by_id.items()}).astype("string")
+        {k: v["expected_advisory_outcome"]["test_assertion"] for k, v in by_id.items()}
+    ).astype("string")
     df["edge_case_mutated_fields"] = mutated
     return df, thresholds, stats
 
@@ -248,12 +299,15 @@ def exemptions(df: pd.DataFrame, cfg: dict) -> dict:
     exempt: dict = {}
     for p in spec(cfg)["profiles"]:
         for rule in p["relaxed_rules"]:
-            exempt[rule] = exempt.get(rule, pd.Series(False, index=df.index)) | primary.eq(p["id"]).fillna(False)
+            exempt[rule] = exempt.get(rule, pd.Series(False, index=df.index)) | primary.eq(p["id"]).fillna(
+                False
+            )
     return exempt
 
 
-def label_and_validate(df: pd.DataFrame, cfg: dict, thresholds: dict, fill_stats: dict,
-                       acceptance: dict | None = None) -> tuple[pd.DataFrame, dict]:
+def label_and_validate(
+    df: pd.DataFrame, cfg: dict, thresholds: dict, fill_stats: dict, acceptance: dict | None = None
+) -> tuple[pd.DataFrame, dict]:
     """Final tags (matches, assertion results) and the per-profile report. Run after enforcement."""
     ec = spec(cfg)
     tags = ec["tag_columns"]
@@ -311,7 +365,8 @@ def _acceptance(profiles: dict, rules: dict) -> dict:
     out = {}
     for pid, r in profiles.items():
         checks = {
-            "share_within_tolerance": abs(r["share_pct"] - r["target_share_pct"]) <= rules["share_tolerance_pp"],
+            "share_within_tolerance": abs(r["share_pct"] - r["target_share_pct"])
+            <= rules["share_tolerance_pp"],
             "min_rows": r["rows"] >= rules["min_rows_per_profile"],
             "assertions": (r["assertion_pass_pct"] or 0) >= 100 * rules["assertion_pass_rate_min"],
         }
